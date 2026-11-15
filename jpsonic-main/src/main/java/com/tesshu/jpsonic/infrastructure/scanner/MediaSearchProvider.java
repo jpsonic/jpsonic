@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -497,8 +498,26 @@ public class MediaSearchProvider implements LegacySearch {
     }
 
     public List<com.tesshu.jpsonic.domain.model.Album> getRandomAlbumsId3(
-            List<com.tesshu.jpsonic.domain.model.MusicFolder> musicFolders, long offset, long count,
-            int casheMax) {
+            List<com.tesshu.jpsonic.domain.model.MusicFolder> folders, long offset, long count,
+            int cacheMax) {
+
+        final List<com.tesshu.jpsonic.domain.model.Album> result = new ArrayList<>();
+
+        // Define logic to extract a sublist (offset + count) from the source list
+        Consumer<List<com.tesshu.jpsonic.domain.model.Album>> addSubsetToResult = files -> files
+            .stream()
+            .skip(offset)
+            .limit(count)
+            .forEach(result::add);
+
+        // Try retrieving from cache first
+        final Optional<List<com.tesshu.jpsonic.domain.model.Album>> cachedAlbums = cache
+            .getAlbumCache(InternalSearchCacheKeys.random.album, cacheMax, folders);
+        if (cachedAlbums.isPresent()) {
+            addSubsetToResult.accept(cachedAlbums.get());
+            return result;
+        }
+
         // Obtain IndexSearcher for ID3-based albums
         IndexSearcher searcher = indexManager.getSearcher(IndexType.ALBUM_ID3);
 
@@ -507,24 +526,31 @@ public class MediaSearchProvider implements LegacySearch {
             return Collections.emptyList();
         }
 
+        List<com.tesshu.jpsonic.domain.model.Album> albums = new ArrayList<>();
         try {
             // Build query to search for random albums (ID3-based) within the given folders
-            Query query = queryFactory.getRandomAlbumsId3(musicFolders);
+            Query query = queryFactory.getRandomAlbumsId3(folders);
 
             // Fetch random album documents and convert them to Album entities
-            return createRandomDocsList(count, searcher, query, util::addAlbumId3IfAnyMatch);
+            albums
+                .addAll(createRandomDocsList(cacheMax, searcher, query,
+                        util::addAlbumId3IfAnyMatch));
 
         } catch (IOException e) {
             // Log any IO or Lucene search error
             LOG.error("Failed to search for random albums (ID3).", e);
-
         } finally {
             // Ensure the IndexSearcher is always released
             indexManager.release(IndexType.ALBUM_ID3, searcher);
         }
 
-        // Fallback in case of errors
-        return Collections.emptyList();
+        // Cache the retrieved albums for future access
+        cache.putAlbumCache(InternalSearchCacheKeys.random.album, cacheMax, folders, albums);
+
+        // Add the subset (offset + count) to the result
+        addSubsetToResult.accept(albums);
+
+        return result;
     }
 
     @Override
