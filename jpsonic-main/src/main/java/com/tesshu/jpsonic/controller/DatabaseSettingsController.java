@@ -79,6 +79,8 @@ public class DatabaseSettingsController {
 
         // for view page control
         command.setUseRadio(settingsFacade.get(SKeys.general.legacy.useRadio));
+        command
+            .setUseDatabaseSettings(settingsFacade.get(SKeys.general.legacy.useDatabaseSettings));
         command.setShareCount(shareService.getAllShares().size());
         User user = userService.getCurrentUserStrict(request);
         command

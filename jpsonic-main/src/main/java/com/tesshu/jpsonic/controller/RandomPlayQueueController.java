@@ -27,10 +27,11 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import com.tesshu.jpsonic.domain.language.StringUtil;
+import com.tesshu.jpsonic.infrastructure.collection.util.LegacyMap;
 import com.tesshu.jpsonic.persistence.api.entity.MusicFolder;
 import com.tesshu.jpsonic.persistence.api.entity.PlayQueue;
 import com.tesshu.jpsonic.persistence.api.entity.Player;
@@ -40,9 +41,6 @@ import com.tesshu.jpsonic.service.MediaFileService;
 import com.tesshu.jpsonic.service.MusicFolderService;
 import com.tesshu.jpsonic.service.PlayerService;
 import com.tesshu.jpsonic.service.UserService;
-import com.tesshu.jpsonic.service.search.IndexManager;
-import com.tesshu.jpsonic.util.LegacyMap;
-import com.tesshu.jpsonic.util.StringUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.apache.commons.lang3.StringUtils;
@@ -71,17 +69,14 @@ public class RandomPlayQueueController {
     private final UserService userService;
     private final PlayerService playerService;
     private final MediaFileService mediaFileService;
-    private final IndexManager indexManager;
 
     public RandomPlayQueueController(MusicFolderService musicFolderService, UserService userService,
-            PlayerService playerService, MediaFileService mediaFileService,
-            IndexManager indexManager) {
+            PlayerService playerService, MediaFileService mediaFileService) {
         super();
         this.musicFolderService = musicFolderService;
         this.userService = userService;
         this.playerService = playerService;
         this.mediaFileService = mediaFileService;
-        this.indexManager = indexManager;
     }
 
     @PostMapping
@@ -106,7 +101,6 @@ public class RandomPlayQueueController {
         LastPlayed lastPlayed = getLastPlayed(lastPlayedValue, lastPlayedComp);
         String genre = StringUtil.equalsIgnoreCase(REQUEST_VALUE_ANY, genreParam) ? null
                 : genreParam;
-        List<String> genres = parseGenre(genre);
         InceptionYear year = getInceptionYear(yearParam);
         AlbumRating albumRating = getAlbumRating(albumRatingValue, albumRatingComp);
         PlayCount playCount = getPlayCount(playCountValue, playCountComp);
@@ -116,12 +110,12 @@ public class RandomPlayQueueController {
 
         // Create instance of Criteria from parsed request parameters
         int size = sizeParam == null ? 24 : sizeParam;
-        ShuffleSelectionParam criteria = new ShuffleSelectionParam(size, genres, year.getFromYear(),
-                year.getToYear(), musicFolders, lastPlayed.getMinLastPlayedDate(),
-                lastPlayed.getMaxLastPlayedDate(), albumRating.getMinAlbumRating(),
-                albumRating.getMaxAlbumRating(), playCount.getMinPlayCount(),
-                playCount.getMaxPlayCount(), rating.isDoesShowStarredSongs(),
-                rating.isDoesShowUnstarredSongs(), format);
+        ShuffleSelectionParam criteria = new ShuffleSelectionParam(size, Arrays.asList(genre),
+                year.getFromYear(), year.getToYear(), musicFolders,
+                lastPlayed.getMinLastPlayedDate(), lastPlayed.getMaxLastPlayedDate(),
+                albumRating.getMinAlbumRating(), albumRating.getMaxAlbumRating(),
+                playCount.getMinPlayCount(), playCount.getMaxPlayCount(),
+                rating.isDoesShowStarredSongs(), rating.isDoesShowUnstarredSongs(), format);
 
         User user = userService.getCurrentUserStrict(request);
         Player player = playerService.getPlayer(request, response);
@@ -377,14 +371,6 @@ public class RandomPlayQueueController {
         boolean isDoesShowUnstarredSongs() {
             return doesShowUnstarredSongs;
         }
-    }
-
-    @Nullable
-    List<String> parseGenre(String genre) {
-        if (null == genre || genre.isEmpty()) {
-            return Collections.emptyList();
-        }
-        return indexManager.toPreAnalyzedGenres(Arrays.asList(genre), true);
     }
 
     @SuppressWarnings("PMD.NullAssignment") // (selectedMusicFolderId) Intentional assignment in the

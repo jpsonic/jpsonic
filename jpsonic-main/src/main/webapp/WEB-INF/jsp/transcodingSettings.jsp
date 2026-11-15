@@ -32,6 +32,7 @@ document.addEventListener('DOMContentLoaded', function () {
     <c:param name="cat" value="transcoding" />
     <c:param name="toast" value="${settings_toast}" />
     <c:param name="useRadio" value="${model.useRadio}"/>
+    <c:param name="useDatabaseSettings" value="${model.useDatabaseSettings}"/>
     <c:param name="existsShare" value="${model.shareCount ne 0}"/>
 </c:import>
 

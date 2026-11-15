@@ -103,7 +103,7 @@ class TranscodingSettingsControllerTest {
             .getModelAndView()
             .getModel()
             .get("model");
-        assertEquals(9, model.size());
+        assertEquals(10, model.size());
         assertEquals(settingsFacade.get(SKeys.transcoding.hlsCommand), model.get("hlsCommand"));
         assertFalse((Boolean) model.get("isOpenDetailSetting"));
         assertFalse((Boolean) model.get("showOutlineHelp"));

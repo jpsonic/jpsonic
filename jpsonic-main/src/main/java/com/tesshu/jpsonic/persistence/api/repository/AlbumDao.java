@@ -28,15 +28,16 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
+import com.tesshu.jpsonic.domain.model.Artist;
+import com.tesshu.jpsonic.domain.policy.RuntimeOrderPolicy.AlbumSortOrder;
+import com.tesshu.jpsonic.infrastructure.collection.util.LegacyMap;
 import com.tesshu.jpsonic.persistence.api.entity.Album;
 import com.tesshu.jpsonic.persistence.api.entity.MediaFile.MediaType;
 import com.tesshu.jpsonic.persistence.api.entity.MusicFolder;
 import com.tesshu.jpsonic.persistence.base.DaoUtils;
 import com.tesshu.jpsonic.persistence.base.TemplateWrapper;
 import com.tesshu.jpsonic.persistence.dialect.DialectAlbumDao;
-import com.tesshu.jpsonic.util.LegacyMap;
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.springframework.jdbc.core.RowMapper;
@@ -47,7 +48,8 @@ import org.springframework.stereotype.Repository;
  *
  * @author Sindre Mehus
  */
-@SuppressWarnings("PMD.AvoidDuplicateLiterals") // Only DAO is allowed to exclude this rule #827
+@SuppressWarnings({ "checkstyle:OverloadMethodsDeclarationOrder", "PMD.AvoidDuplicateLiterals",
+        "PMD.FieldDeclarationsShouldBeAtStartOfClass" })
 @Repository
 public class AlbumDao {
 
@@ -210,26 +212,6 @@ public class AlbumDao {
                 """.formatted(join, order), rowMapper, args);
     }
 
-    public int getAlbumCount(final List<MusicFolder> musicFolders) {
-        if (musicFolders.isEmpty()) {
-            return 0;
-        }
-        List<Integer> ids = musicFolders
-            .stream()
-            .map(MusicFolder::getId)
-            .collect(Collectors.toList());
-        Map<String, Object> args = LegacyMap.of("folders", ids);
-        Integer result = template.getNamedParameterJdbcTemplate().queryForObject("""
-                select count(*)
-                from album
-                where present and folder_id in (:folders)
-                """, args, Integer.class);
-        if (result != null) {
-            return result;
-        }
-        return 0;
-    }
-
     public List<Album> getMostFrequentlyPlayedAlbums(final int offset, final int count,
             final List<MusicFolder> musicFolders) {
         if (musicFolders.isEmpty()) {
@@ -316,7 +298,7 @@ public class AlbumDao {
         }
     }
 
-    public List<Album> getAlbumsByGenre(int offset, int count, List<String> genres,
+    public List<Album> getAlbumsByGenre(long offset, long count, List<String> genres,
             List<MusicFolder> folders) {
         return dialect.getAlbumsByGenre(offset, count, genres, folders);
     }
@@ -393,5 +375,167 @@ public class AlbumDao {
                 from album
                 where artist = :artist and present and folder_id in (:folders)
                 """, 0, args);
+    }
+
+    // ############################################################################
+    // Jpsonic domain
+
+    private static final String DOMAIN_COLUMNS_QUERY = """
+            id, name, artist, song_count, comment\s
+            """;
+
+    private final RowMapper<com.tesshu.jpsonic.domain.model.Album> domainRowMapper = (rs,
+            num) -> new com.tesshu.jpsonic.domain.model.Album(rs.getInt(1), // id,
+                    rs.getString(2), // String name,
+                    rs.getString(3), // String artist,
+                    rs.getInt(4), // int songCount,
+                    rs.getString(5) // String comment
+    );
+
+    public int countAlbums(List<com.tesshu.jpsonic.domain.model.MusicFolder> folders) {
+        if (folders.isEmpty()) {
+            return 0;
+        }
+        Map<String, Object> args = Map
+            .of("folders",
+                    folders.stream().map(com.tesshu.jpsonic.domain.model.MusicFolder::id).toList());
+        return template.namedQueryForInt("""
+                select count(*)
+                from album
+                where folder_id in (:folders)
+                """, 0, args);
+    }
+
+    public List<com.tesshu.jpsonic.domain.model.Album> findAlbums(
+            List<com.tesshu.jpsonic.domain.model.MusicFolder> folders, AlbumSortOrder order,
+            long offset, long count) {
+        if (folders.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // spotless:off
+        Map<String, Object> args = Map
+            .of("folders",
+                    folders.stream().map(com.tesshu.jpsonic.domain.model.MusicFolder::id).toList(),
+                    "offset", offset,
+                    "count", count);
+        // spotless:on
+
+        String query = switch (order) {
+        case DEFAULT -> "select " + DOMAIN_COLUMNS_QUERY + """
+                from album
+                where album.folder_id in (:folders)
+                order by album_order
+                offset :offset limit :count
+                """;
+        case BY_ARTIST_AND_ALBUM -> "select " + prefix(DOMAIN_COLUMNS_QUERY, "album") + """
+                from album
+                left join artist on artist.name = album.artist
+                where album.folder_id in (:folders)
+                order by artist_order, album_order
+                offset :offset limit :count
+                """;
+        case YEAR -> throw new IllegalArgumentException("Not yet supported.");
+        };
+
+        return template.namedQuery(query, domainRowMapper, args);
+    }
+
+    public List<com.tesshu.jpsonic.domain.model.Album> findAlbums(
+            List<com.tesshu.jpsonic.domain.model.MusicFolder> folders, Artist parent,
+            AlbumSortOrder order, long offset, long count) {
+        if (folders.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // spotless:off
+        Map<String, Object> args = Map.of(
+                    "artist", parent.name(),
+                    "folders",
+                    folders.stream().map(com.tesshu.jpsonic.domain.model.MusicFolder::id).toList(),
+                    "offset", offset,
+                    "count", count);
+        // spotless:on
+
+        String orderQuery = switch (order) {
+        case DEFAULT -> "order by album_order";
+        case YEAR -> "order by year is null, year, album_order";
+        case BY_ARTIST_AND_ALBUM -> throw new IllegalArgumentException("Not yet supported.");
+        };
+
+        return template.namedQuery("select " + DOMAIN_COLUMNS_QUERY + """
+                from album
+                where artist = :artist and folder_id in (:folders)
+                %s
+                offset :offset limit :count
+                """.formatted(orderQuery), domainRowMapper, args);
+    }
+
+    public List<com.tesshu.jpsonic.domain.model.Album> findNewestAlbums(
+            List<com.tesshu.jpsonic.domain.model.MusicFolder> folders, long offset, long count) {
+        if (folders.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // spotless:off
+        Map<String, Object> args = Map.of(
+                    "folders",
+                    folders.stream().map(com.tesshu.jpsonic.domain.model.MusicFolder::id).toList(),
+                    "offset", offset,
+                    "count", count);
+        // spotless:on
+
+        return template.namedQuery("select " + DOMAIN_COLUMNS_QUERY + """
+                from album
+                where present and folder_id in (:folders)
+                order by created desc
+                offset :offset limit :count
+                """, domainRowMapper, args);
+    }
+
+    // ############################################################################
+    // Jpsonic domain (Search)
+
+    public com.tesshu.jpsonic.domain.model.Album getDomainAlbum(int id) {
+        return template.queryOne("select " + DOMAIN_COLUMNS_QUERY + """
+                from album
+                where id=?
+                """, domainRowMapper, id);
+    }
+
+    public List<com.tesshu.jpsonic.domain.model.Album> findAlbums(
+            List<com.tesshu.jpsonic.domain.model.MusicFolder> folders, List<String> genres,
+            AlbumSortOrder order, long offset, long count) {
+        if (genres.isEmpty() || folders.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // spotless:off
+        Map<String, Object> args = Map.of(
+                    "folders",
+                    folders.stream().map(com.tesshu.jpsonic.domain.model.MusicFolder::id).toList(),
+                    "genres", genres,
+                    "offset", offset,
+                    "count", count);
+        // spotless:on
+
+        String query = switch (order) {
+        case DEFAULT -> "select " + DOMAIN_COLUMNS_QUERY + """
+                from album
+                where album.folder_id in (:folders) and album.genre in (:genres)
+                order by album_order
+                offset :offset limit :count
+                """;
+        case BY_ARTIST_AND_ALBUM -> "select " + prefix(DOMAIN_COLUMNS_QUERY, "album") + """
+                from album
+                left join artist on artist.name = album.artist
+                where album.folder_id in (:folders) and album.genre in (:genre)
+                order by artist_order, album_order
+                offset :offset limit :count
+                """;
+        case YEAR -> throw new IllegalArgumentException("Not yet supported.");
+        };
+
+        return template.namedQuery(query, domainRowMapper, args);
     }
 }

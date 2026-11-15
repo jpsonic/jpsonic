@@ -421,7 +421,9 @@ public class UserDao {
         public UserSettings mapRow(ResultSet rs, int rowNum) throws SQLException {
             int col = 1;
             UserSettings settings = new UserSettings(rs.getString(col++));
-            settings.setLocale(StringUtil.parseLocale(rs.getString(col++)));
+            settings
+                .setLocale(com.tesshu.jpsonic.domain.language.StringUtil
+                    .parseLocale(rs.getString(col++)));
             settings.setThemeId(rs.getString(col++));
             settings.setFinalVersionNotificationEnabled(rs.getBoolean(col++));
             col++; // BetaVersionNotificationEnable

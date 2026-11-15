@@ -36,6 +36,8 @@ import java.util.concurrent.ExecutionException;
 
 import com.tesshu.jpsonic.feature.filesystem.LibraryAccessPolicy;
 import com.tesshu.jpsonic.infrastructure.core.NeedsHome;
+import com.tesshu.jpsonic.infrastructure.scanner.MusicFolderServiceImpl;
+import com.tesshu.jpsonic.infrastructure.scanner.ScannerStateServiceImpl;
 import com.tesshu.jpsonic.infrastructure.settings.SettingsFacade;
 import com.tesshu.jpsonic.infrastructure.settings.SettingsFacadeBuilder;
 import com.tesshu.jpsonic.persistence.api.entity.MusicFolder;
@@ -43,8 +45,6 @@ import com.tesshu.jpsonic.persistence.api.repository.MusicFolderDao;
 import com.tesshu.jpsonic.service.PlayerService;
 import com.tesshu.jpsonic.service.StatusService;
 import com.tesshu.jpsonic.service.UserService;
-import com.tesshu.jpsonic.service.scanner.MusicFolderServiceImpl;
-import com.tesshu.jpsonic.service.scanner.ScannerStateServiceImpl;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.apache.commons.io.IOUtils;

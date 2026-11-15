@@ -39,12 +39,17 @@ import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.stream.Stream;
 
+import com.tesshu.jpsonic.domain.model.Genre;
+import com.tesshu.jpsonic.domain.model.IndexWithCount;
+import com.tesshu.jpsonic.domain.model.MediaFile.Type;
+import com.tesshu.jpsonic.domain.model.MusicIndex;
+import com.tesshu.jpsonic.domain.model.Playlist;
+import com.tesshu.jpsonic.domain.policy.RuntimeOrderPolicy;
+import com.tesshu.jpsonic.infrastructure.collection.util.LegacyMap;
 import com.tesshu.jpsonic.persistence.api.entity.Album;
-import com.tesshu.jpsonic.persistence.api.entity.Genre;
 import com.tesshu.jpsonic.persistence.api.entity.MediaFile;
 import com.tesshu.jpsonic.persistence.api.entity.MediaFile.MediaType;
 import com.tesshu.jpsonic.persistence.api.entity.MusicFolder;
-import com.tesshu.jpsonic.persistence.api.entity.MusicIndex;
 import com.tesshu.jpsonic.persistence.base.DaoUtils;
 import com.tesshu.jpsonic.persistence.base.TemplateWrapper;
 import com.tesshu.jpsonic.persistence.dialect.DialectMediaFileDao;
@@ -53,7 +58,6 @@ import com.tesshu.jpsonic.persistence.result.ArtistSortCandidate;
 import com.tesshu.jpsonic.persistence.result.ArtistSortCandidate.TargetField;
 import com.tesshu.jpsonic.persistence.result.DuplicateSort;
 import com.tesshu.jpsonic.persistence.result.SortCandidate;
-import com.tesshu.jpsonic.util.LegacyMap;
 import org.apache.commons.lang3.StringUtils;
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.checkerframework.checker.nullness.qual.Nullable;
@@ -66,7 +70,8 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * @author Sindre Mehus
  */
-@SuppressWarnings({ "PMD.AvoidDuplicateLiterals", "PMD.TooManyStaticImports" })
+@SuppressWarnings({ "checkstyle:OverloadMethodsDeclarationOrder", "PMD.AvoidDuplicateLiterals",
+        "PMD.TooManyStaticImports", "PMD.FieldDeclarationsShouldBeAtStartOfClass" })
 @Repository
 public class MediaFileDao {
 
@@ -115,41 +120,6 @@ public class MediaFileDao {
                 """, rowMapper, id);
     }
 
-    public List<MediaFile> getMediaFile(MediaType mediaType, long count, long offset,
-            List<MusicFolder> folders) {
-        if (folders.isEmpty()) {
-            return Collections.emptyList();
-        }
-        Map<String, Object> args = LegacyMap
-            .of("type", mediaType.name(), "count", count, "offset", offset, "folders",
-                    MusicFolder.toPathList(folders));
-        return template.namedQuery("select " + QUERY_COLUMNS + """
-                from media_file
-                where present and type= :type and folder in(:folders)
-                limit :count offset :offset
-                """, rowMapper, args);
-    }
-
-    public com.tesshu.jpsonic.domain.model.MediaFile getDomainMediaFile(int id) {
-        return template.queryOne("""
-                select
-                m.id,
-                f.id,
-                m.path,
-                m.format,
-                m.type,
-                m.bit_Rate,
-                m.duration_seconds,
-                m.file_size,
-                m.artist,
-                m.album,
-                m.title
-                from media_file m
-                join music_folder f on m.folder = f.path
-                where id=?
-                """, domainRowMapper, id);
-    }
-
     public List<MediaFile> getVideos(final int count, final int offset,
             final List<MusicFolder> musicFolders) {
         if (musicFolders.isEmpty()) {
@@ -166,24 +136,6 @@ public class MediaFileDao {
                 """, rowMapper, args);
     }
 
-    public long getSizeOf(List<MusicFolder> folders, MediaType mediaType) {
-        if (folders.isEmpty()) {
-            return 0;
-        }
-        Map<String, Object> args = LegacyMap
-            .of("type", mediaType.name(), "folders", MusicFolder.toPathList(folders));
-        long defaultValue = 0;
-        String query = """
-                select count(*)
-                from media_file
-                where present and type= :type and folder in(:folders)
-                """;
-        List<Long> list = template
-            .getNamedParameterJdbcTemplate()
-            .queryForList(query, args, Long.class);
-        return list.isEmpty() ? defaultValue : list.get(0) == null ? defaultValue : list.get(0);
-    }
-
     public int getChildSizeOf(List<MusicFolder> folders, MediaType... excludes) {
         if (folders.isEmpty()) {
             return 0;
@@ -197,64 +149,6 @@ public class MediaFileDao {
                 from media_file
                 where parent_path in(:folders) and present %s
                 """.formatted(typeFilter), 0, args);
-    }
-
-    public int getChildSizeOf(String path, MediaType... excludes) {
-        Map<String, Object> args = Map
-            .of("parentPath", path, "excludes", Stream.of(excludes).map(MediaType::name).toList());
-        String typeFilter = excludes.length == 0 ? "" : "and type not in(:excludes)";
-        return template.namedQueryForInt("""
-                select count(*)
-                from media_file
-                where parent_path=:parentPath and present %s
-                """.formatted(typeFilter), 0, args);
-    }
-
-    public int getChildSizeOf(List<MusicFolder> folders, List<String> genres, String albumArtist,
-            String album, MediaType... types) {
-        if (folders.isEmpty()) {
-            return 0;
-        }
-        Map<String, Object> args = LegacyMap
-            .of("folders", MusicFolder.toPathList(folders), "types",
-                    Arrays.asList(types).stream().map(MediaType::name).toList(), "genres", genres,
-                    "albumArtist", albumArtist, "album", album);
-        return template.namedQueryForInt("""
-                select count(*)
-                from media_file
-                where folder in (:folders) and present
-                        and album_artist = :albumArtist and album = :album
-                        and genre in (:genres) and type in (:types)
-                """, 0, args);
-    }
-
-    public List<IndexWithCount> getMudicIndexCounts(List<MusicFolder> folders,
-            List<String> shortcutPaths) {
-        if (folders.isEmpty()) {
-            return Collections.emptyList();
-        }
-        Map<String, Object> args = LegacyMap
-            .of("types", List.of(MediaType.DIRECTORY.name(), MediaType.ALBUM.name()), "folders",
-                    MusicFolder.toPathList(folders), "shotcuts", shortcutPaths);
-        String shotcutFilter = shortcutPaths.isEmpty() ? "" : "and path not in (:shotcuts)";
-        return template.namedQuery("""
-                select distinct music_index, count(music_index)
-                from media_file
-                where type in(:types) and present
-                        and parent_path in(:folders)
-                        %s
-                group by music_index
-                order by music_index
-                """.formatted(shotcutFilter), indexWithCountMapper, args);
-    }
-
-    public int getCountInPlaylist(int playlistId) {
-        return template.queryForInt("""
-                select count(*)
-                from playlist_file, media_file
-                where media_file.id = playlist_file.media_file_id
-                        and playlist_file.playlist_id = ? and present
-                """, 0, playlistId);
     }
 
     public List<Genre> getGenreCounts() {
@@ -322,129 +216,6 @@ public class MediaFileDao {
                 order by type_order, %s
                 offset :offset limit :count
                 """.formatted(typeFilter, order), rowMapper, args);
-    }
-
-    public List<MediaFile> getChildrenOf(List<MusicFolder> folders, long offset, long count,
-            MediaType... excludes) {
-        Map<String, Object> args = LegacyMap
-            .of("directory", MediaFile.MediaType.DIRECTORY.name(), "album",
-                    MediaFile.MediaType.ALBUM.name(), "music", MediaFile.MediaType.MUSIC.name(),
-                    "audiobook", MediaFile.MediaType.AUDIOBOOK.name(), "video",
-                    MediaFile.MediaType.VIDEO.name(), "folders", MusicFolder.toPathList(folders),
-                    "count", count, "offset", offset, "excludes",
-                    Stream.of(excludes).map(MediaType::name).toList());
-        String typeFilter = excludes.length == 0 ? "" : "and type not in(:excludes)";
-        return template.namedQuery("select " + QUERY_COLUMNS + """
-                        ,
-                        case type
-                            when :directory then 1
-                            when :album then 2
-                            when :music then 3
-                            when :audiobook then 4
-                            when :video then 5
-                        end as type_order
-                from media_file
-                where present and parent_path in (:folders)
-                %s
-                order by type_order, media_file_order
-                offset :offset limit :count
-                """.formatted(typeFilter), rowMapper, args);
-    }
-
-    public List<MediaFile> getChildrenOf(List<MusicFolder> folders, MusicIndex musicIndex,
-            long offset, long count, MediaType... excludes) {
-        Map<String, Object> args = LegacyMap
-            .of("directory", MediaFile.MediaType.DIRECTORY.name(), "album",
-                    MediaFile.MediaType.ALBUM.name(), "music", MediaFile.MediaType.MUSIC.name(),
-                    "audiobook", MediaFile.MediaType.AUDIOBOOK.name(), "video",
-                    MediaFile.MediaType.VIDEO.name(), "folders", MusicFolder.toPathList(folders),
-                    "musicIndex", musicIndex.getIndex(), "count", count, "offset", offset,
-                    "excludes", Stream.of(excludes).map(MediaType::name).toList());
-        String typeFilter = excludes.length == 0 ? "" : "and type not in(:excludes)";
-        return template.namedQuery("select " + QUERY_COLUMNS + """
-                        ,
-                        case type
-                            when :directory then 1
-                            when :album then 2
-                            when :music then 3
-                            when :audiobook then 4
-                            when :video then 5
-                        end as type_order
-                from media_file
-                where music_index=:musicIndex and present and parent_path in (:folders)
-                %s
-                order by type_order, media_file_order
-                offset :offset limit :count
-                """.formatted(typeFilter), rowMapper, args);
-    }
-
-    public List<MediaFile> getChildrenOf(List<MusicFolder> folders, List<String> genres,
-            String albumArtist, String album, int offset, int count, MediaType... types) {
-        if (genres.isEmpty()) {
-            return Collections.emptyList();
-        }
-        Map<String, Object> args = LegacyMap
-            .of("folders", MusicFolder.toPathList(folders), "types",
-                    Arrays.asList(types).stream().map(MediaType::name).toList(), "genres", genres,
-                    "albumArtist", albumArtist, "album", album, "count", count, "offset", offset);
-        return template.namedQuery("select " + QUERY_COLUMNS + """
-                from media_file
-                where folder in (:folders) and present
-                        and album_artist = :albumArtist and album = :album
-                        and genre in (:genres) and type in (:types)
-                order by media_file_order, track_number
-                offset :offset limit :count
-                """, rowMapper, args);
-    }
-
-    public List<MediaFile> getDirectChildFiles(List<MusicFolder> folders, long offset, long count,
-            MediaType... excludes) {
-        if (folders.isEmpty()) {
-            return Collections.emptyList();
-        }
-        Map<String, Object> args = Map
-            .of("types", List.of(MediaType.DIRECTORY.name(), MediaType.ALBUM.name()), "folders",
-                    MusicFolder.toPathList(folders), "excludes",
-                    Stream.of(excludes).map(MediaType::name).toList());
-        String typeFilter = excludes.length == 0 ? "" : "and type not in(:excludes)";
-        return template.namedQuery("select " + prefix(QUERY_COLUMNS, "m_file") + """
-                from media_file m_file
-                join music_folder m_folder on m_file.folder = m_folder.path
-                where type not in (:types) and parent_path in(:folders)
-                %s
-                order by m_folder.folder_order, m_file.media_file_order
-                """.formatted(typeFilter), rowMapper, args);
-    }
-
-    public List<MediaFile> getIndexedDirs(List<MusicFolder> folders, List<String> shortcuts) {
-        if (folders.isEmpty()) {
-            return Collections.emptyList();
-        }
-        Map<String, Object> args = Map
-            .of("types", List.of(MediaType.DIRECTORY.name(), MediaType.ALBUM.name()), "directory",
-                    MediaFile.MediaType.DIRECTORY.name(), "album", MediaFile.MediaType.ALBUM.name(),
-                    "folders", MusicFolder.toPathList(folders), "shortcuts", shortcuts);
-        String shortcutsFilter = shortcuts.isEmpty() ? "" : """
-                      and case type
-                          when :directory then artist not in (:shortcuts)
-                          when :album then album not in (:shortcuts)
-                      end
-                """;
-        return template.namedQuery("select " + QUERY_COLUMNS + """
-                        ,
-                        case type
-                            when :directory then 1
-                            when :album then 2
-                        end as type_order
-                from media_file
-                where folder in(:folders)
-                        and parent_path in(:folders)
-                        and path not in(:folders)
-                        and type in(:types)
-                        and music_index <> ''
-                        %s
-                order by type_order, media_file_order
-                """.formatted(shortcutsFilter), rowMapper, args);
     }
 
     public List<MediaFile> getSongsForAlbum(final long offset, final long count, String albumArtist,
@@ -640,7 +411,7 @@ public class MediaFileDao {
             template.update("""
                     insert into genre(name, song_count, album_count)
                     values(?, ?, ?)
-                    """, genre.getName(), genre.getSongCount(), genre.getAlbumCount());
+                    """, genre.name(), genre.songCount(), genre.albumCount());
         }
     }
 
@@ -781,7 +552,7 @@ public class MediaFileDao {
         }
     }
 
-    public List<MediaFile> getAlbumsByGenre(final int offset, final int count,
+    public List<MediaFile> getAlbumsByGenre(final long offset, long count,
             final List<String> genres, final List<MusicFolder> musicFolders) {
 
         if (musicFolders.isEmpty() || genres.isEmpty()) {
@@ -859,8 +630,8 @@ public class MediaFileDao {
         return dialect.getUnregisteredId3Albums(count, musicFolders, withPodcast);
     }
 
-    public List<MediaFile> getSongsByGenre(final List<String> genres, final int offset,
-            final int count, final List<MusicFolder> musicFolders, List<MediaType> types) {
+    public List<MediaFile> getSongsByGenre(final List<String> genres, final long offset, long count,
+            final List<MusicFolder> musicFolders, List<MediaType> types) {
         return dialect.getSongsByGenre(genres, offset, count, musicFolders, types);
     }
 
@@ -1171,7 +942,7 @@ public class MediaFileDao {
                         update media_file
                         set artist_reading = ?, artist_sort = ?, music_index = ?
                         where id = ?
-                        """, cand.getReading(), cand.getSort(), cand.getMusicIndex(),
+                        """, cand.getReading(), cand.getSort(), cand.musicIndex().get(),
                         cand.getTargetId());
         } else if (cand.getTargetField() == TargetField.ARTIST) {
             template.update("""
@@ -1207,7 +978,7 @@ public class MediaFileDao {
                 cols.append("artist_reading=?, artist_sort=?, music_index = ?, ");
                 args.add(cand.getReading());
                 args.add(cand.getSort());
-                args.add(cand.getMusicIndex());
+                args.add(cand.musicIndex().get());
             } else if (cand.getTargetField() == TargetField.ARTIST) {
                 cols.append("artist_reading=?, artist_sort=?, ");
                 args.add(cand.getReading());
@@ -1397,6 +1168,587 @@ public class MediaFileDao {
         }
     }
 
-    public record IndexWithCount(String index, int directoryCount) {
+    // ############################################################################
+    // Jpsonic domain
+
+    private static final String DOMAIN_JOINED_COLUMNS_QUERY = DaoUtils.DOMAIN_JOINED_COLUMNS_QUERY;
+    private static final String DOMAIN_JOINED_TABLES_QUERY = DaoUtils.DOMAIN_JOINED_TABLES_QUERY;
+    private static final String DOMAIN_ROOT_COLUMNS_QUERY = DaoUtils.DOMAIN_ROOT_COLUMNS_QUERY;
+    private static final String DOMAIN_ROOT_TABLES_QUERY = DaoUtils.DOMAIN_ROOT_TABLES_QUERY;
+
+    public int countMediaFile(List<com.tesshu.jpsonic.domain.model.MusicFolder> folders,
+            com.tesshu.jpsonic.domain.model.MediaFile.Type mediaType) {
+        if (folders.isEmpty()) {
+            return 0;
+        }
+        Map<String, Object> args = Map
+            .of("type", mediaType.name(), "folders",
+                    com.tesshu.jpsonic.domain.model.MusicFolder.toPathList(folders));
+        String query = """
+                select count(*)
+                from media_file
+                where type= :type and folder in(:folders)
+                """;
+        return template.namedQueryForInt(query, 0, args);
+    }
+
+    public int countChildren(List<com.tesshu.jpsonic.domain.model.MusicFolder> folders,
+            com.tesshu.jpsonic.domain.model.MediaFile.Type... excludes) {
+        if (folders.isEmpty()) {
+            return 0;
+        }
+
+        Map<String, Object> args = Map
+            .of("folders", com.tesshu.jpsonic.domain.model.MusicFolder.toPathList(folders),
+                    "excludes",
+                    Stream
+                        .of(excludes)
+                        .map(com.tesshu.jpsonic.domain.model.MediaFile.Type::name)
+                        .toList());
+        return template.namedQueryForInt("""
+                select count(*)
+                from media_file
+                where parent_path in(:folders) %s
+                """.formatted(excludes.length == 0 ? "" : "and type not in(:excludes)"), 0, args);
+    }
+
+    public int countChildren(com.tesshu.jpsonic.domain.model.MediaFile parent,
+            com.tesshu.jpsonic.domain.model.MediaFile.Type... excludes) {
+        Map<String, Object> args = Map
+            .of("parentPath", parent.pathString(), "excludes",
+                    Stream
+                        .of(excludes)
+                        .map(com.tesshu.jpsonic.domain.model.MediaFile.Type::name)
+                        .toList());
+        return template.namedQueryForInt("""
+                select count(*)
+                from media_file
+                where parent_path=:parentPath and present %s
+                """.formatted(excludes.length == 0 ? "" : "and type not in(:excludes)"), 0, args);
+    }
+
+    public boolean existsAccessibleMediaFile(String username,
+            com.tesshu.jpsonic.domain.model.MediaFile mediaFile) {
+        String query = """
+                select 1 from media_file mf
+                join music_folder f on mf.folder = f.path
+                join music_folder_user mfu on mfu.music_folder_id = f.id
+                where mf.id = ? and mfu.username = ?
+                """;
+        return template.queryForInt(query, 0, mediaFile.id(), username) > 0;
+    }
+
+    public List<com.tesshu.jpsonic.domain.model.MediaFile> findAlbums(
+            List<com.tesshu.jpsonic.domain.model.MusicFolder> folders,
+            RuntimeOrderPolicy.AlbumSortOrder order, long offset, long count) {
+        if (folders.isEmpty()) {
+            return Collections.emptyList();
+        }
+        // spotless:off
+        Map<String, Object> args = LegacyMap.of(
+                "type",
+                    com.tesshu.jpsonic.domain.model.MediaFile.Type.ALBUM.name(),
+                "folders", com.tesshu.jpsonic.domain.model.MusicFolder.toPathList(folders),
+                "count", count,
+                "offset", offset);
+        // spotless:on
+
+        String orderQuery = switch (order) {
+        case BY_ARTIST_AND_ALBUM -> "order by pmf.media_file_order, mf.media_file_order";
+        default -> "order by mf.media_file_order";
+        };
+        return template
+            .namedQuery("select " + DOMAIN_JOINED_COLUMNS_QUERY + DOMAIN_JOINED_TABLES_QUERY + """
+                    where mf.type = :type and mf.folder in (:folders)
+                    %s
+                    offset :offset limit :count
+                    """.formatted(orderQuery), domainRowMapper, args);
+    }
+
+    public List<com.tesshu.jpsonic.domain.model.MediaFile> findChildren(
+            List<com.tesshu.jpsonic.domain.model.MusicFolder> folders,
+            com.tesshu.jpsonic.domain.model.Album parent, long offset, long count,
+            com.tesshu.jpsonic.domain.model.MediaFile.Type... excludes) {
+        if (folders.isEmpty() || parent.artist().isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // spotless:off
+        Map<String, Object> args = LegacyMap.of(
+                "directory",
+                    com.tesshu.jpsonic.domain.model.MediaFile.Type.DIRECTORY.name(),
+                "album",
+                    com.tesshu.jpsonic.domain.model.MediaFile.Type.ALBUM.name(),
+                "music",
+                    com.tesshu.jpsonic.domain.model.MediaFile.Type.MUSIC.name(),
+                "audiobook",
+                    com.tesshu.jpsonic.domain.model.MediaFile.Type.AUDIOBOOK.name(),
+                "video",
+                    com.tesshu.jpsonic.domain.model.MediaFile.Type.VIDEO.name(),
+                "artistName", parent.artist().get(),
+                "albumName", parent.name(),
+                "folders",
+                    com.tesshu.jpsonic.domain.model.MusicFolder.toPathList(folders),
+                "offset", offset,
+                "count", count,
+                "excludes", Stream.of(excludes)
+                        .map(com.tesshu.jpsonic.domain.model.MediaFile.Type::name).toList());
+        // spotless:on
+
+        String typeFilter = excludes.length == 0 ? "" : "and type not in(:excludes)";
+
+        String query = "select " + DOMAIN_JOINED_COLUMNS_QUERY + """
+                ,
+                case mf.type
+                    when :directory then 1
+                    when :album then 2
+                    when :music then 3
+                    when :audiobook then 4
+                    when :video then 5
+                end as type_order
+                """ + DOMAIN_JOINED_TABLES_QUERY + """
+                where mf.album_artist=:artistName
+                    and mf.album=:albumName
+                    and mf.folder in (:folders)
+                    %s
+                order by type_order,
+                    mf.disc_number is null, mf.disc_number,
+                    mf.track_number is null, mf.track_number,
+                    mf.media_file_order
+                offset :offset limit :count
+                """.formatted(typeFilter);
+
+        return template.namedQuery(query, domainRowMapper, args);
+    }
+
+    public List<com.tesshu.jpsonic.domain.model.MediaFile> findChildren(
+            List<com.tesshu.jpsonic.domain.model.MusicFolder> folders, long offset, long count,
+            com.tesshu.jpsonic.domain.model.MediaFile.Type... excludes) {
+        if (folders.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // spotless:off
+        Map<String, Object> args = LegacyMap.of(
+                "directory",
+                    com.tesshu.jpsonic.domain.model.MediaFile.Type.DIRECTORY.name(),
+                "album",
+                    com.tesshu.jpsonic.domain.model.MediaFile.Type.ALBUM.name(),
+                "music",
+                    com.tesshu.jpsonic.domain.model.MediaFile.Type.MUSIC.name(),
+                "audiobook",
+                    com.tesshu.jpsonic.domain.model.MediaFile.Type.AUDIOBOOK.name(),
+                "video",
+                    com.tesshu.jpsonic.domain.model.MediaFile.Type.VIDEO.name(),
+                "folders",
+                    com.tesshu.jpsonic.domain.model.MusicFolder.toPathList(folders),
+                "offset", offset,
+                "count", count,
+                "excludes", Stream.of(excludes)
+                        .map(com.tesshu.jpsonic.domain.model.MediaFile.Type::name).toList());
+        // spotless:on
+
+        String typeFilter = excludes.length == 0 ? "" : "and type not in(:excludes)";
+        return template.namedQuery("select " + DOMAIN_JOINED_COLUMNS_QUERY + """
+                        ,
+                        case mf.type
+                            when :directory then 1
+                            when :album then 2
+                            when :music then 3
+                            when :audiobook then 4
+                            when :video then 5
+                        end as type_order\s
+                """ + DOMAIN_JOINED_TABLES_QUERY + """
+                where parent_path in (:folders)
+                %s
+                order by type_order, mf.media_file_order
+                offset :offset limit :count
+                """.formatted(typeFilter), domainRowMapper, args);
+    }
+
+    public List<com.tesshu.jpsonic.domain.model.MediaFile> findChildren(
+            List<com.tesshu.jpsonic.domain.model.MusicFolder> folders, MusicIndex musicIndex,
+            long offset, long count, com.tesshu.jpsonic.domain.model.MediaFile.Type... excludes) {
+        if (folders.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // spotless:off
+        Map<String, Object> args = LegacyMap.of(
+                "directory",
+                    com.tesshu.jpsonic.domain.model.MediaFile.Type.DIRECTORY.name(),
+                "album",
+                    com.tesshu.jpsonic.domain.model.MediaFile.Type.ALBUM.name(),
+                "music",
+                    com.tesshu.jpsonic.domain.model.MediaFile.Type.MUSIC.name(),
+                "audiobook",
+                    com.tesshu.jpsonic.domain.model.MediaFile.Type.AUDIOBOOK.name(),
+                "video",
+                    com.tesshu.jpsonic.domain.model.MediaFile.Type.VIDEO.name(),
+                "folders",
+                    com.tesshu.jpsonic.domain.model.MusicFolder.toPathList(folders),
+                "musicIndex", musicIndex.index(),
+                "offset", offset,
+                "count", count,
+                "excludes", Stream.of(excludes)
+                    .map(com.tesshu.jpsonic.domain.model.MediaFile.Type::name).toList());
+        // spotless:on
+
+        String typeFilter = excludes.length == 0 ? "" : "and type not in(:excludes)";
+        return template.namedQuery("select " + DOMAIN_JOINED_COLUMNS_QUERY + """
+                ,
+                case mf.type
+                    when :directory then 1
+                    when :album then 2
+                    when :music then 3
+                    when :audiobook then 4
+                    when :video then 5
+                end as type_order\s
+                """ + DOMAIN_JOINED_TABLES_QUERY + """
+                where mf.music_index=:musicIndex and mf.parent_path in (:folders)
+                %s
+                order by type_order, mf.media_file_order
+                offset :offset limit :count
+                """.formatted(typeFilter), domainRowMapper, args);
+    }
+
+    public List<com.tesshu.jpsonic.domain.model.MediaFile> findChildren(
+            com.tesshu.jpsonic.domain.model.MediaFile parent, RuntimeOrderPolicy.ChildOrder order,
+            long offset, long count, com.tesshu.jpsonic.domain.model.MediaFile.Type... excludes) {
+
+        // spotless:off
+        Map<String, Object> args = Map.of(
+                "directory",
+                    com.tesshu.jpsonic.domain.model.MediaFile.Type.DIRECTORY.name(),
+                "album",
+                    com.tesshu.jpsonic.domain.model.MediaFile.Type.ALBUM.name(),
+                "music",
+                    com.tesshu.jpsonic.domain.model.MediaFile.Type.MUSIC.name(),
+                "audiobook",
+                    com.tesshu.jpsonic.domain.model.MediaFile.Type.AUDIOBOOK.name(),
+                "video",
+                com.tesshu.jpsonic.domain.model.MediaFile.Type.VIDEO.name(),
+                "path", parent.pathString(),
+                "count", count,
+                "offset", offset,
+                "excludes",
+                    Stream.of(excludes)
+                    .map(com.tesshu.jpsonic.domain.model.MediaFile.Type::name)
+                    .toList());
+        // spotless:on
+
+        String typeFilter = excludes.length == 0 ? "" : "and mf.type not in(:excludes)\s";
+
+        String orderQuery = switch (order) {
+        case DEFAULT -> "order by type_order, mf.media_file_order\s";
+        case YEAR -> "order by type_order, mf.year is null, mf.year, mf.media_file_order\s";
+        case TRACK -> """
+                order by type_order,
+                    mf.disc_number is null, mf.disc_number,
+                    mf.track_number is null, mf.track_number,
+                    media_file_order\s
+                """;
+        };
+
+        return template.namedQuery("select " + DOMAIN_JOINED_COLUMNS_QUERY + """
+                ,
+                case mf.type
+                    when :directory then 1
+                    when :album then 2
+                    when :music then 3
+                    when :audiobook then 4
+                    when :video then 5
+                end as type_order
+                """ + DOMAIN_JOINED_TABLES_QUERY + """
+                where parent_path=:path
+                %s
+                %s
+                offset :offset limit :count
+                """.formatted(typeFilter, orderQuery), domainRowMapper, args);
+    }
+
+    public List<com.tesshu.jpsonic.domain.model.MediaFile> findIndexedDirectories(
+            List<com.tesshu.jpsonic.domain.model.MusicFolder> folders, List<String> shortcuts) {
+        if (folders.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // spotless:off
+        Map<String, Object> args = Map.of(
+                "types", List.of(
+                        com.tesshu.jpsonic.domain.model.MediaFile.Type.DIRECTORY.name(),
+                        com.tesshu.jpsonic.domain.model.MediaFile.Type.ALBUM.name()),
+                "directory", MediaFile.MediaType.DIRECTORY.name(),
+                "album", MediaFile.MediaType.ALBUM.name(),
+                "folders", com.tesshu.jpsonic.domain.model.MusicFolder.toPathList(folders),
+                "shortcuts", shortcuts);
+                // spotless:on
+
+        String shortcutsFilter = shortcuts.isEmpty() ? "" : """
+                and case mf.type
+                    when :directory then mf.artist not in (:shortcuts)
+                    when :album then mf.album not in (:shortcuts)
+                end
+                """;
+
+        return template.namedQuery("select " + DOMAIN_ROOT_COLUMNS_QUERY + """
+                        ,
+                        case mf.type
+                            when :directory then 1
+                            when :album then 2
+                        end as type_order
+                """ + DOMAIN_ROOT_TABLES_QUERY + """
+                where mf.folder in(:folders)
+                        and mf.parent_path in(:folders)
+                        and mf.path not in(:folders)
+                        and mf.type in(:types)
+                        and mf.music_index <> ''
+                        %s
+                order by type_order, mf.media_file_order
+                """.formatted(shortcutsFilter), domainRowMapper, args);
+    }
+
+    public List<IndexWithCount> findIndexWithCounts(
+            List<com.tesshu.jpsonic.domain.model.MusicFolder> folders, List<String> shortcutPaths) {
+        if (folders.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // spotless:off
+        Map<String, Object> args = LegacyMap.of(
+                "types", List.of(
+                        com.tesshu.jpsonic.domain.model.MediaFile.Type.DIRECTORY.name(),
+                        com.tesshu.jpsonic.domain.model.MediaFile.Type.ALBUM.name()),
+                "folders", com.tesshu.jpsonic.domain.model.MusicFolder.toPathList(folders),
+                "shotcuts", shortcutPaths);
+        // spotless:on
+
+        String shotcutFilter = shortcutPaths.isEmpty() ? "" : "and path not in (:shotcuts)";
+
+        return template.namedQuery("""
+                select distinct music_index, count(music_index)
+                from media_file
+                where type in(:types)
+                        and parent_path in(:folders)
+                        %s
+                group by music_index
+                order by music_index
+                """.formatted(shotcutFilter), indexWithCountMapper, args);
+    }
+
+    public List<com.tesshu.jpsonic.domain.model.MediaFile> findMediaFile(
+            List<com.tesshu.jpsonic.domain.model.MusicFolder> folders,
+            com.tesshu.jpsonic.domain.model.MediaFile.Type targetType, long offset, long count) {
+        if (folders.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // spotless:off
+        Map<String, Object> args = LegacyMap.of(
+                "folders", com.tesshu.jpsonic.domain.model.MusicFolder.toPathList(folders),
+                "type", targetType.name(),
+                "count", count,
+                "offset", offset);
+        // spotless:on
+
+        return template
+            .namedQuery("select " + DOMAIN_JOINED_COLUMNS_QUERY + DOMAIN_JOINED_TABLES_QUERY + """
+                    where type = :type and folder in(:folders)
+                    offset :offset limit :count
+                    """, domainRowMapper, args);
+    }
+
+    public List<com.tesshu.jpsonic.domain.model.MediaFile> findNewestAlbums(
+            List<com.tesshu.jpsonic.domain.model.MusicFolder> folders, long offset, long count) {
+        if (folders.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // spotless:off
+        Map<String, Object> args = Map.of(
+                "type", MediaFile.MediaType.ALBUM.name(),
+                "folders", com.tesshu.jpsonic.domain.model.MusicFolder.toPathList(folders),
+                "count", count,
+                "offset", offset);
+        // spotless:on
+
+        return template
+            .namedQuery("select " + DOMAIN_JOINED_COLUMNS_QUERY + DOMAIN_JOINED_TABLES_QUERY + """
+                    where type = :type and folder in (:folders)
+                    order by created desc
+                    offset :offset limit :count
+                    """, domainRowMapper, args);
+    }
+
+    public com.tesshu.jpsonic.domain.model.MediaFile getDomainMediaFile(int id) {
+        return template
+            .queryOne("select " + DOMAIN_JOINED_COLUMNS_QUERY + DOMAIN_JOINED_TABLES_QUERY
+                    + "where mf.id=?", domainRowMapper, id);
+    }
+
+    public com.tesshu.jpsonic.domain.model.MediaFile getDomainMediaFile(Path path) {
+        return template
+            .queryOne("select " + DOMAIN_JOINED_COLUMNS_QUERY + DOMAIN_JOINED_TABLES_QUERY
+                    + "where mf.path=?", domainRowMapper, path.toString());
+    }
+
+    public com.tesshu.jpsonic.domain.model.MediaFile getDomainMusicFolder(Path path) {
+        return template
+            .queryOne("select " + DOMAIN_ROOT_COLUMNS_QUERY + DOMAIN_ROOT_TABLES_QUERY
+                    + "where mf.path=?", domainRowMapper, path.toString());
+    }
+
+    // ############################################################################
+    // Jpsonic domain (Search)
+
+    public List<com.tesshu.jpsonic.domain.model.MediaFile> getSongsByGenres(
+            List<com.tesshu.jpsonic.domain.model.MusicFolder> folders, List<String> genres,
+            long offset, long count, com.tesshu.jpsonic.domain.model.MediaFile.Type... types) {
+        if (folders.isEmpty() || genres.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // spotless:off
+        Map<String, Object> args = Map.of(
+                "folders", com.tesshu.jpsonic.domain.model.MusicFolder.toPathList(folders),
+                "types", Stream.of(types).map(com.tesshu.jpsonic.domain.model.MediaFile.Type::name).toList(),
+                "genres", genres,
+                "offset", offset,
+                "count", count);
+        // spotless:on
+
+        return template.namedQuery("select " + DOMAIN_JOINED_COLUMNS_QUERY + """
+                , mf.media_file_order = -1 as is_under_root
+                """ + DOMAIN_JOINED_TABLES_QUERY + """
+                left join media_file ar on pmf.parent_path = ar.path
+                join music_folder on mf.folder = music_folder.path
+                where
+                    mf.folder in (:folders)
+                    and mf.type in (:types)
+                    and mf.genre in (:genres)
+                order by
+                    is_under_root,
+                    ar.media_file_order, pmf.media_file_order,
+                    folder_order,
+                    mf.media_file_order,
+                    mf.track_number
+                offset :offset limit :count
+                """, domainRowMapper, args);
+    }
+
+    public List<com.tesshu.jpsonic.domain.model.MediaFile> getDomainRandomSongsForAlbumArtist(
+            int limit, String albumArtist,
+            List<com.tesshu.jpsonic.domain.model.MusicFolder> musicFolders,
+            BiFunction<Integer, Integer, List<Integer>> randomCallback) {
+        return dialect
+            .getDomainRandomSongsForAlbumArtist(limit, albumArtist, musicFolders, randomCallback);
+    }
+
+    public int countChldren(List<com.tesshu.jpsonic.domain.model.MusicFolder> folders,
+            List<String> genres, com.tesshu.jpsonic.domain.model.Album album, Type... types) {
+        if (folders.isEmpty() || genres.isEmpty()) {
+            return 0;
+        }
+
+        // spotless:off
+        Map<String, Object> args = Map.of(
+                "folders", com.tesshu.jpsonic.domain.model.MusicFolder.toPathList(folders),
+                "types", Stream.of(types).map(com.tesshu.jpsonic.domain.model.MediaFile.Type::name).toList(),
+                "genres", genres,
+                "albumArtist", album.artist().orElse(""),
+                "album", album.name());
+        // spotless:on
+
+        return template.namedQueryForInt("select count(*) " + DOMAIN_JOINED_TABLES_QUERY + """
+                where mf.folder in (:folders)
+                    and mf.album_artist = :albumArtist
+                    and mf.album = :album
+                    and mf.genre in (:genres)
+                    and mf.type in (:types)
+                """, 0, args);
+    }
+
+    public List<com.tesshu.jpsonic.domain.model.MediaFile> findChildren(
+            List<com.tesshu.jpsonic.domain.model.MusicFolder> folders, List<String> genres,
+            com.tesshu.jpsonic.domain.model.Album album, long offset, long count,
+            com.tesshu.jpsonic.domain.model.MediaFile.Type... types) {
+        if (folders.isEmpty() || genres.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // spotless:off
+        Map<String, Object> args = Map.of(
+                "folders", com.tesshu.jpsonic.domain.model.MusicFolder.toPathList(folders),
+                "types", Stream.of(types).map(com.tesshu.jpsonic.domain.model.MediaFile.Type::name).toList(),
+                "genres", genres,
+                "albumArtist", album.artist().orElse(""),
+                "album", album.name(),
+                "count", count,
+                "offset", offset);
+        // spotless:on
+
+        return template
+            .namedQuery("select " + DOMAIN_JOINED_COLUMNS_QUERY + DOMAIN_JOINED_TABLES_QUERY + """
+                    where mf.folder in (:folders)
+                        and mf.album_artist = :albumArtist
+                        and mf.album = :album
+                        and mf.genre in (:genres)
+                        and mf.type in (:types)
+                    order by mf.media_file_order, mf.track_number
+                    offset :offset limit :count
+                    """, domainRowMapper, args);
+    }
+
+    public List<com.tesshu.jpsonic.domain.model.MediaFile> findChildren(
+            List<com.tesshu.jpsonic.domain.model.MusicFolder> folders, Playlist playlist,
+            long offset, long count, com.tesshu.jpsonic.domain.model.MediaFile.Type... excludes) {
+        if (folders.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // spotless:off
+        Map<String, Object> args = Map.of(
+                "folders", com.tesshu.jpsonic.domain.model.MusicFolder.toPathList(folders),
+                "playlistId", playlist.id(),
+                "excludes", Stream.of(excludes).map(com.tesshu.jpsonic.domain.model.MediaFile.Type::name).toList(),
+                "offset", offset,
+                "count", count);
+        // spotless:on
+
+        return template
+            .namedQuery("select " + DOMAIN_JOINED_COLUMNS_QUERY + DOMAIN_JOINED_TABLES_QUERY + """
+                    join playlist_file on mf.id = playlist_file.media_file_id
+                    where mf.folder in (:folders)
+                        and mf.type not in (:excludes)
+                        and playlist_file.playlist_id = :playlistId
+                    order by mf.media_file_order, mf.track_number
+                    offset :offset limit :count
+                    """, domainRowMapper, args);
+    }
+
+    public List<com.tesshu.jpsonic.domain.model.MediaFile> findAlbumsByGenres(
+            final List<com.tesshu.jpsonic.domain.model.MusicFolder> folders,
+            final List<String> genres, final long offset, long count) {
+        if (folders.isEmpty() || genres.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // spotless:off
+        Map<String, Object> args = Map.of("type",
+                MediaType.ALBUM.name(),
+                "genres", genres,
+                "folders", com.tesshu.jpsonic.domain.model.MusicFolder.toPathList(folders),
+                "count", count,
+                "offset", offset);
+        // spotless:on
+
+        return template
+            .namedQuery("select " + DOMAIN_JOINED_COLUMNS_QUERY + DOMAIN_JOINED_TABLES_QUERY + """
+                    where mf.type = :type
+                        and mf.folder in (:folders)
+                        and mf.genre in (:genres)
+                    order by media_file_order
+                    limit :count offset :offset
+                    """, domainRowMapper, args);
     }
 }

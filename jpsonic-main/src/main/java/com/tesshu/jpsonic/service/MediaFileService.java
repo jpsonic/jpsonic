@@ -37,8 +37,9 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import com.tesshu.jpsonic.SuppressFBWarnings;
-import com.tesshu.jpsonic.domain.provider.MediaFileProvider;
+import com.tesshu.jpsonic.domain.language.StringUtil;
 import com.tesshu.jpsonic.feature.filesystem.LibraryAccessPolicy;
+import com.tesshu.jpsonic.infrastructure.comparator.JpsonicComparators;
 import com.tesshu.jpsonic.infrastructure.filesystem.PathInspector;
 import com.tesshu.jpsonic.infrastructure.filesystem.RootPathEntryGuard;
 import com.tesshu.jpsonic.infrastructure.filesystem.ScanningExclusionPolicy;
@@ -47,14 +48,10 @@ import com.tesshu.jpsonic.infrastructure.settings.SettingsFacade;
 import com.tesshu.jpsonic.persistence.api.entity.MediaFile;
 import com.tesshu.jpsonic.persistence.api.entity.MediaFile.MediaType;
 import com.tesshu.jpsonic.persistence.api.entity.MusicFolder;
-import com.tesshu.jpsonic.persistence.api.entity.MusicIndex;
 import com.tesshu.jpsonic.persistence.api.repository.MediaFileDao;
 import com.tesshu.jpsonic.persistence.api.repository.MediaFileDao.ChildOrder;
-import com.tesshu.jpsonic.persistence.api.repository.MediaFileDao.IndexWithCount;
 import com.tesshu.jpsonic.persistence.param.ShuffleSelectionParam;
-import com.tesshu.jpsonic.service.language.JpsonicComparators;
 import com.tesshu.jpsonic.service.metadata.ParserUtils;
-import com.tesshu.jpsonic.util.StringUtil;
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.springframework.stereotype.Service;
@@ -65,7 +62,7 @@ import org.springframework.stereotype.Service;
  * @author Sindre Mehus
  */
 @Service("mediaFileService")
-public class MediaFileService implements MediaFileProvider {
+public class MediaFileService {
 
     private final SettingsFacade settingsFacade;
     private final ScanningExclusionPolicy scanningExclusionPolicy;
@@ -145,7 +142,6 @@ public class MediaFileService implements MediaFileProvider {
     }
 
     @SuppressWarnings("unused")
-    @Override
     public com.tesshu.jpsonic.domain.model.@NonNull MediaFile requireMediaFile(int id) {
         com.tesshu.jpsonic.domain.model.MediaFile mediaFile = mediaFileDao.getDomainMediaFile(id);
         if (mediaFile == null) {
@@ -176,21 +172,6 @@ public class MediaFileService implements MediaFileProvider {
             ChildOrder childOrder, MediaType... excludes) {
         return mediaFileDao
             .getChildrenOf(parent.getPathString(), offset, count, childOrder, excludes);
-    }
-
-    public List<MediaFile> getChildrenOf(List<MusicFolder> folders, long offset, long count,
-            MediaType... excludes) {
-        return mediaFileDao.getChildrenOf(folders, offset, count, excludes);
-    }
-
-    public List<MediaFile> getChildrenOf(List<MusicFolder> folders, MusicIndex musicIndex,
-            long offset, long count, MediaType... excludes) {
-        return mediaFileDao.getChildrenOf(folders, musicIndex, offset, count, excludes);
-    }
-
-    public List<MediaFile> getDirectChildFiles(List<MusicFolder> folders, long offset, long count,
-            MediaType... excludes) {
-        return mediaFileDao.getDirectChildFiles(folders, offset, count, excludes);
     }
 
     public List<MediaFile> getChildrenWithoutSortOf(MediaFile parent, boolean includeFiles,
@@ -383,62 +364,12 @@ public class MediaFileService implements MediaFileProvider {
         mediaFile.setStarredDate(starredDate);
     }
 
-    public long getAlbumCount(List<MusicFolder> musicFolders) {
-        return mediaFileDao.getSizeOf(musicFolders, MediaType.ALBUM);
-    }
-
     public int getPlayedAlbumCount(List<MusicFolder> musicFolders) {
         return mediaFileDao.getPlayedAlbumCount(musicFolders);
     }
 
     public int getStarredAlbumCount(String username, List<MusicFolder> musicFolders) {
         return mediaFileDao.getStarredAlbumCount(username, musicFolders);
-    }
-
-    public int getChildSizeOf(MediaFile mediaFile, MediaType... excludes) {
-        return mediaFileDao.getChildSizeOf(mediaFile.getPathString());
-    }
-
-    public int getChildSizeOf(List<MusicFolder> folders, MediaType... excludes) {
-        return mediaFileDao.getChildSizeOf(folders, excludes);
-    }
-
-    public long countSongs(List<MusicFolder> folders) {
-        return mediaFileDao.getSizeOf(folders, MediaType.MUSIC);
-    }
-
-    public List<MediaFile> getSongs(long count, long offset, List<MusicFolder> folders) {
-        return mediaFileDao.getMediaFile(MediaType.MUSIC, count, offset, folders);
-    }
-
-    public long countVideos(List<MusicFolder> folders) {
-        return mediaFileDao.getSizeOf(folders, MediaType.VIDEO);
-    }
-
-    public List<MediaFile> getVideos(long count, long offset, List<MusicFolder> folders) {
-        return mediaFileDao.getMediaFile(MediaType.VIDEO, count, offset, folders);
-    }
-
-    public List<MediaFile> getSongsForAlbum(final long offset, final long count, String albumArtist,
-            String album) {
-        return mediaFileDao.getSongsForAlbum(offset, count, albumArtist, album);
-    }
-
-    public List<MediaFile> getIndexedDirs(List<MusicFolder> folders) {
-        return mediaFileDao
-            .getIndexedDirs(folders,
-                    settingsFacade.getCachedList(SKeys.general.extension.shortcuts));
-    }
-
-    public List<IndexWithCount> getMudicIndexCounts(List<MusicFolder> folders) {
-        List<String> shortcutPaths = settingsFacade
-            .getCachedList(SKeys.general.extension.shortcuts)
-            .stream()
-            .flatMap(shortcut -> folders
-                .stream()
-                .map(folder -> Path.of(folder.getPathString(), shortcut).toString()))
-            .toList();
-        return mediaFileDao.getMudicIndexCounts(folders, shortcutPaths);
     }
 
     @Nullable

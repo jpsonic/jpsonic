@@ -33,12 +33,13 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import com.tesshu.jpsonic.domain.model.IndexWithCount;
+import com.tesshu.jpsonic.infrastructure.collection.util.LegacyMap;
 import com.tesshu.jpsonic.persistence.api.entity.Artist;
 import com.tesshu.jpsonic.persistence.api.entity.MediaFile.MediaType;
 import com.tesshu.jpsonic.persistence.api.entity.MusicFolder;
-import com.tesshu.jpsonic.persistence.api.entity.MusicIndex;
 import com.tesshu.jpsonic.persistence.base.TemplateWrapper;
-import com.tesshu.jpsonic.util.LegacyMap;
+import org.apache.commons.lang3.StringUtils;
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.springframework.jdbc.core.RowMapper;
@@ -49,7 +50,7 @@ import org.springframework.stereotype.Repository;
  *
  * @author Sindre Mehus
  */
-@SuppressWarnings("PMD.AvoidDuplicateLiterals") // Only DAO is allowed to exclude this rule #827
+@SuppressWarnings({ "PMD.AvoidDuplicateLiterals", "PMD.FieldDeclarationsShouldBeAtStartOfClass" })
 @Repository
 public class ArtistDao {
 
@@ -95,16 +96,6 @@ public class ArtistDao {
                 from artist
                 where id=?
                 """, rowMapper, id);
-    }
-
-    public List<Artist> getArtists(MusicIndex musicIndex, List<MusicFolder> folders, long offset,
-            long count) {
-        return template.query("select " + QUERY_COLUMNS + """
-                from artist
-                where music_index=?
-                order by artist_order
-                offset ? limit ?
-                """, rowMapper, musicIndex.getIndex(), offset, count);
     }
 
     public @Nullable Artist updateArtist(Artist artist) {
@@ -272,38 +263,6 @@ public class ArtistDao {
                 """, count, id);
     }
 
-    public int getMudicIndexCount(List<MusicFolder> folders) {
-        if (folders.isEmpty()) {
-            return 0;
-        }
-        Map<String, Object> args = LegacyMap
-            .of("folders", folders.stream().map(MusicFolder::getId).toList());
-        Integer result = template.getNamedParameterJdbcTemplate().queryForObject("""
-                select count(distinct music_index)
-                from artist
-                where present and folder_id in (:folders)
-                """, args, Integer.class);
-        if (result != null) {
-            return result;
-        }
-        return 0;
-    }
-
-    public List<IndexWithCount> getMudicIndexCounts(List<MusicFolder> folders) {
-        if (folders.isEmpty()) {
-            return Collections.emptyList();
-        }
-        Map<String, Object> args = LegacyMap
-            .of("folders", folders.stream().map(MusicFolder::getId).toList());
-        return template.namedQuery("""
-                select distinct music_index, count(music_index)
-                from artist
-                where present and folder_id in(:folders)
-                group by music_index
-                order by music_index
-                """, indexWithCountMapper, args);
-    }
-
     private static class ArtistMapper implements RowMapper<Artist> {
         @Override
         public Artist mapRow(ResultSet rs, int rowNum) throws SQLException {
@@ -321,18 +280,137 @@ public class ArtistDao {
         }
     }
 
-    public int getArtistsCount(final List<MusicFolder> musicFolders) {
-        if (musicFolders.isEmpty()) {
+    // ############################################################################
+    // Jpsonic domain
+
+    private static final String DOMAIN_COLUMNS_QUERY = """
+            id, name, cover_art_path, album_count,
+            folder_id, reading, artist_order, music_index\s
+            """;
+    private final RowMapper<com.tesshu.jpsonic.domain.model.Artist> domainRowMapper = (ResultSet rs,
+            int num) -> new com.tesshu.jpsonic.domain.model.Artist(//
+                    rs.getInt(1), // id,
+                    rs.getString(2), // name,
+                    rs.getString(3), // coverArtPath,
+                    rs.getInt(4), // albumCount,
+                    rs.getInt(5), // folderId,
+                    rs.getString(6), // reading,
+                    rs.getInt(7), // order,
+                    rs.getString(8)// musicIndex);
+    );
+
+    public int countArtists(List<com.tesshu.jpsonic.domain.model.MusicFolder> folders) {
+        if (folders.isEmpty()) {
             return 0;
         }
-        Map<String, Object> args = LegacyMap.of("folders", MusicFolder.toIdList(musicFolders));
-        return template.namedQueryForInt("""
-                select count(id)
-                from artist
-                where present and folder_id in (:folders)
-                """, 0, args);
+        Map<String, Object> args = Map
+            .of("folders",
+                    folders.stream().map(com.tesshu.jpsonic.domain.model.MusicFolder::id).toList());
+        String query = "select count(*) from artist where folder_id in(:folders)";
+        return template.namedQueryForInt(query, 0, args);
     }
 
-    public record IndexWithCount(String index, int artistCount) {
+    public int countChildren(List<com.tesshu.jpsonic.domain.model.MusicFolder> folders,
+            String artistName) {
+        if (folders.isEmpty() || StringUtils.isEmpty(artistName)) {
+            return 0;
+        }
+        Map<String, Object> args = Map
+            .of("folders",
+                    folders.stream().map(com.tesshu.jpsonic.domain.model.MusicFolder::id).toList(),
+                    "artistName", artistName);
+        String query = """
+                select count(*) from album
+                join artist on artist.name = album.artist
+                where folder_id in(:folders) and artist.name = :artistName
+                """;
+        return template.namedQueryForInt(query, 0, args);
+    }
+
+    public int countMudicIndexes(List<com.tesshu.jpsonic.domain.model.MusicFolder> folders) {
+        if (folders.isEmpty()) {
+            return 0;
+        }
+        Map<String, Object> args = LegacyMap
+            .of("folders",
+                    folders.stream().map(com.tesshu.jpsonic.domain.model.MusicFolder::id).toList());
+        Integer result = template.getNamedParameterJdbcTemplate().queryForObject("""
+                select count(distinct music_index)
+                from artist
+                where present and folder_id in (:folders)
+                """, args, Integer.class);
+        if (result != null) {
+            return result;
+        }
+        return 0;
+    }
+
+    public List<com.tesshu.jpsonic.domain.model.Artist> findArtists(
+            List<com.tesshu.jpsonic.domain.model.MusicFolder> folders, long offset, long count) {
+        if (folders.isEmpty()) {
+            return Collections.emptyList();
+        }
+        // spotless:off
+        Map<String, Object> args = Map
+            .of("folders",
+                    folders.stream().map(com.tesshu.jpsonic.domain.model.MusicFolder::id).toList(),
+                    "offset", offset,
+                    "count", count);
+        // spotless:on
+
+        return template.namedQuery("select " + DOMAIN_COLUMNS_QUERY + """
+                from artist
+                where folder_id in (:folders)
+                order by artist_order
+                offset :offset limit :count
+                """, domainRowMapper, args);
+    }
+
+    public List<com.tesshu.jpsonic.domain.model.Artist> findArtists(
+            List<com.tesshu.jpsonic.domain.model.MusicFolder> folders, String musicIndex,
+            long offset, long count) {
+        if (folders.isEmpty()) {
+            return Collections.emptyList();
+        }
+        // spotless:off
+        Map<String, Object> args = Map
+            .of("folders",
+                    folders.stream().map(com.tesshu.jpsonic.domain.model.MusicFolder::id).toList(),
+                    "musicIndex", musicIndex,
+                    "offset", offset,
+                    "count", count);
+        // spotless:on
+
+        return template.namedQuery("select " + DOMAIN_COLUMNS_QUERY + """
+                from artist
+                where folder_id in (:folders) and music_index = :musicIndex
+                order by artist_order
+                offset :offset limit :count
+                """, domainRowMapper, args);
+    }
+
+    public List<IndexWithCount> findIndexWithCounts(
+            List<com.tesshu.jpsonic.domain.model.MusicFolder> folders) {
+        if (folders.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Map<String, Object> args = Map
+            .of("folders",
+                    folders.stream().map(com.tesshu.jpsonic.domain.model.MusicFolder::id).toList());
+        return template.namedQuery("""
+                select distinct music_index, count(music_index)
+                from artist
+                where present and folder_id in(:folders)
+                group by music_index
+                order by music_index
+                """, indexWithCountMapper, args);
+    }
+
+    public com.tesshu.jpsonic.domain.model.Artist getDomainArtist(int id) {
+        return template.queryOne("select " + DOMAIN_COLUMNS_QUERY + """
+                from artist
+                where id=?
+                """, domainRowMapper, id);
     }
 }

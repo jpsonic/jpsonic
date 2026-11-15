@@ -21,7 +21,7 @@
 
 package com.tesshu.jpsonic.controller;
 
-import com.tesshu.jpsonic.util.LegacyMap;
+import com.tesshu.jpsonic.infrastructure.collection.util.LegacyMap;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;

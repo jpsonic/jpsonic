@@ -39,6 +39,7 @@ import java.util.stream.Collectors;
 
 import com.tesshu.jpsonic.SuppressLint;
 import com.tesshu.jpsonic.controller.VideoPlayerController;
+import com.tesshu.jpsonic.domain.language.StringUtil;
 import com.tesshu.jpsonic.domain.model.TranscodingDefinition.BitRateLimit;
 import com.tesshu.jpsonic.feature.auth.jwt.JWTAuthenticationToken;
 import com.tesshu.jpsonic.feature.stream.TranscodeInputStream;
@@ -53,7 +54,6 @@ import com.tesshu.jpsonic.persistence.api.entity.Transcoding;
 import com.tesshu.jpsonic.persistence.api.repository.TranscodingDao;
 import com.tesshu.jpsonic.persistence.core.entity.User;
 import com.tesshu.jpsonic.persistence.core.entity.UserSettings;
-import com.tesshu.jpsonic.util.StringUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.checkerframework.checker.nullness.qual.Nullable;
@@ -511,7 +511,7 @@ public class TranscodingService {
             return true;
         }
 
-        String executable = StringUtil.split(step).get(0);
+        String executable = com.tesshu.jpsonic.util.StringUtil.split(step).get(0);
         try (DirectoryStream<Path> ds = Files.newDirectoryStream(transcodeDir)) {
             for (Path child : ds) {
                 Path filename = child.getFileName();

@@ -21,12 +21,13 @@ package com.tesshu.jpsonic.service;
 
 import java.util.Optional;
 
+import com.tesshu.jpsonic.domain.provider.state.ScannerStateProvider;
 import com.tesshu.jpsonic.persistence.core.entity.ScanEvent.ScanEventType;
 
 /**
  * MediaScanner interface.
  */
-public interface MediaScannerService extends ScannerStateService {
+public interface MediaScannerService extends ScannerStateProvider {
 
     /**
      * Returns whether a media library scan is currently in the process of being

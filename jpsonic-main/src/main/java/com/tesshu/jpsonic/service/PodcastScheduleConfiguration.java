@@ -25,6 +25,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 
+import com.tesshu.jpsonic.domain.provider.state.ScannerStateProvider;
 import com.tesshu.jpsonic.infrastructure.settings.SKeys;
 import com.tesshu.jpsonic.infrastructure.settings.SettingsFacade;
 import org.slf4j.Logger;
@@ -46,15 +47,15 @@ public class PodcastScheduleConfiguration implements SchedulingConfigurer {
     private final TaskScheduler taskScheduler;
     private final SettingsFacade settingsFacade;
     private final PodcastService podcastService;
-    private final ScannerStateService scannerStateService;
+    private final ScannerStateProvider scannerStateProvider;
 
     public PodcastScheduleConfiguration(TaskScheduler taskScheduler, SettingsFacade settingsFacade,
-            PodcastService podcastService, ScannerStateService scannerStateService) {
+            PodcastService podcastService, ScannerStateProvider scannerStateProvider) {
         super();
         this.taskScheduler = taskScheduler;
         this.settingsFacade = settingsFacade;
         this.podcastService = podcastService;
-        this.scannerStateService = scannerStateService;
+        this.scannerStateProvider = scannerStateProvider;
     }
 
     /*
@@ -70,25 +71,25 @@ public class PodcastScheduleConfiguration implements SchedulingConfigurer {
         scheduledTaskRegistrar.setScheduler(taskScheduler);
 
         scheduledTaskRegistrar.addTriggerTask(() -> {
-            if (scannerStateService.isScanning()) {
+            if (scannerStateProvider.isScanning()) {
                 LOG.info("Is scanning. Automatic podcast updates will not be performed.");
             } else {
                 LOG.info("Auto Podcast update will be performed.");
                 podcastService.refreshAllChannels(true);
             }
-        }, new PodcastUpdateTrigger(settingsFacade, scannerStateService));
+        }, new PodcastUpdateTrigger(settingsFacade, scannerStateProvider));
     }
 
     static class PodcastUpdateTrigger implements Trigger {
 
         private final SettingsFacade settingsFacade;
-        private final ScannerStateService scannerStateService;
+        private final ScannerStateProvider scannerStateProvider;
 
         PodcastUpdateTrigger(SettingsFacade settingsFacade,
-                ScannerStateService scannerStateService) {
+                ScannerStateProvider scannerStateProvider) {
             super();
             this.settingsFacade = settingsFacade;
-            this.scannerStateService = scannerStateService;
+            this.scannerStateProvider = scannerStateProvider;
         }
 
         @Override
@@ -101,7 +102,7 @@ public class PodcastScheduleConfiguration implements SchedulingConfigurer {
                 .format(nextTime);
 
             String msg;
-            if (this.scannerStateService.isScanning()) {
+            if (this.scannerStateProvider.isScanning()) {
                 msg = "Auto Podcast update has been rescheduled because being scanning. (Next {})";
             } else {
                 msg = "Auto Podcast update every "
@@ -126,7 +127,7 @@ public class PodcastScheduleConfiguration implements SchedulingConfigurer {
                 return null;
             }
             Instant lastTime = triggerContext.lastCompletion();
-            boolean isReschedule = lastTime == null || this.scannerStateService.isScanning();
+            boolean isReschedule = lastTime == null || this.scannerStateProvider.isScanning();
             return isReschedule ? createFirstTime() : lastTime.plus(hoursBetween, ChronoUnit.HOURS);
         }
     }

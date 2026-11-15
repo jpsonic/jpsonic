@@ -32,24 +32,26 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import com.tesshu.jpsonic.domain.model.Genre;
+import com.tesshu.jpsonic.domain.model.MusicFolderContent;
+import com.tesshu.jpsonic.domain.provider.master.GenreMasterProvider;
+import com.tesshu.jpsonic.domain.provider.resource.MusicFolderProvider;
+import com.tesshu.jpsonic.domain.provider.resource.MusicIndexProvider;
+import com.tesshu.jpsonic.domain.provider.state.ScannerStateProvider;
 import com.tesshu.jpsonic.domain.system.AlbumListType;
 import com.tesshu.jpsonic.domain.system.CoverArtScheme;
+import com.tesshu.jpsonic.infrastructure.collection.util.LegacyMap;
+import com.tesshu.jpsonic.infrastructure.search.LegacySearch;
 import com.tesshu.jpsonic.infrastructure.settings.SKeys;
 import com.tesshu.jpsonic.infrastructure.settings.SettingsFacade;
-import com.tesshu.jpsonic.persistence.api.entity.Genre;
 import com.tesshu.jpsonic.persistence.api.entity.MediaFile;
 import com.tesshu.jpsonic.persistence.api.entity.MusicFolder;
-import com.tesshu.jpsonic.persistence.api.entity.MusicFolderContent;
 import com.tesshu.jpsonic.persistence.core.entity.User;
 import com.tesshu.jpsonic.persistence.core.entity.UserSettings;
 import com.tesshu.jpsonic.service.MediaFileService;
 import com.tesshu.jpsonic.service.MusicFolderService;
-import com.tesshu.jpsonic.service.MusicIndexService;
 import com.tesshu.jpsonic.service.RatingService;
-import com.tesshu.jpsonic.service.ScannerStateService;
-import com.tesshu.jpsonic.service.SearchService;
 import com.tesshu.jpsonic.service.UserService;
-import com.tesshu.jpsonic.util.LegacyMap;
 import jakarta.servlet.http.HttpServletRequest;
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.checkerframework.checker.nullness.qual.Nullable;
@@ -74,25 +76,30 @@ public class HomeController {
     private final SettingsFacade settingsFacade;
     private final UserService userService;
     private final MusicFolderService musicFolderService;
-    private final ScannerStateService scannerStateService;
+    private final ScannerStateProvider scannerStateProvider;
     private final RatingService ratingService;
     private final MediaFileService mediaFileService;
-    private final SearchService searchService;
-    private final MusicIndexService musicIndexService;
+    private final LegacySearch legacySearch;
+    private final GenreMasterProvider genreMasterProvider;
+    private final MusicFolderProvider musicFolderProvider;
+    private final MusicIndexProvider musicIndexProvider;
 
     public HomeController(SettingsFacade settingsFacade, UserService userService,
-            MusicFolderService musicFolderService, ScannerStateService scannerStateService,
+            MusicFolderService musicFolderService, ScannerStateProvider scannerStateProvider,
             RatingService ratingService, MediaFileService mediaFileService,
-            SearchService searchService, MusicIndexService musicIndexService) {
+            LegacySearch legacySearch, GenreMasterProvider genreMasterProvider,
+            MusicFolderProvider musicFolderProvider, MusicIndexProvider musicIndexProvider) {
         super();
         this.settingsFacade = settingsFacade;
         this.userService = userService;
         this.musicFolderService = musicFolderService;
-        this.scannerStateService = scannerStateService;
+        this.scannerStateProvider = scannerStateProvider;
         this.ratingService = ratingService;
         this.mediaFileService = mediaFileService;
-        this.searchService = searchService;
-        this.musicIndexService = musicIndexService;
+        this.legacySearch = legacySearch;
+        this.genreMasterProvider = genreMasterProvider;
+        this.musicFolderProvider = musicFolderProvider;
+        this.musicIndexProvider = musicIndexProvider;
     }
 
     @GetMapping
@@ -149,21 +156,26 @@ public class HomeController {
             albums = getByYear(listOffset, LIST_SIZE, decade, decade + 9, musicFolders);
             break;
         case GENRE:
-            List<Genre> genres = searchService.getGenres(true);
+            List<Genre> genres = genreMasterProvider.getLegacyGenres(true, 0, Integer.MAX_VALUE);
             map.put("genres", genres);
             if (!genres.isEmpty()) {
                 String genre = getStringParameter(request, Attributes.Request.GENRE.value(),
-                        genres.get(0).getName());
+                        genres.get(0).name());
                 map.put("genre", genre);
                 albums = getByGenre(listOffset, LIST_SIZE, genre, musicFolders);
             }
             break;
         case INDEX:
-            MusicFolderContent musicFolderContent = musicIndexService
-                .getMusicFolderContent(musicFolders);
-            map.put("indexedArtists", musicFolderContent.getIndexedArtists());
-            map.put("singleSongs", musicFolderContent.getSingleSongs());
-            map.put("indexes", musicFolderContent.getIndexedArtists().keySet());
+            List<com.tesshu.jpsonic.domain.model.MusicFolder> folders = musicFolders
+                .stream()
+                .map(MusicFolder::getId)
+                .map(musicFolderProvider::requireMusicFolder)
+                .toList();
+            MusicFolderContent musicFolderContent = musicIndexProvider
+                .findMusicFolderContent(folders);
+            map.put("indexedArtists", musicFolderContent.indexedArtists());
+            map.put("singleSongs", musicFolderContent.singleSongs());
+            map.put("indexes", musicFolderContent.indexedArtists().keySet());
             map.put("isOpenDetailIndex", userSettings.isOpenDetailIndex());
             map.put("assignAccesskeyToNumber", userSettings.isAssignAccesskeyToNumber());
             break;
@@ -178,7 +190,7 @@ public class HomeController {
         map.put("welcomeTitle", settingsFacade.get(SKeys.general.welcome.title));
         map.put("welcomeSubtitle", settingsFacade.get(SKeys.general.welcome.subtitle));
         map.put("welcomeMessage", settingsFacade.get(SKeys.general.welcome.message));
-        map.put("isIndexBeingCreated", scannerStateService.isScanning());
+        map.put("isIndexBeingCreated", scannerStateProvider.isScanning());
         map.put("musicFoldersExist", !musicFolderService.getAllMusicFolders().isEmpty());
         map.put("listType", listType.getId());
         map.put("listSize", LIST_SIZE);
@@ -248,7 +260,7 @@ public class HomeController {
 
     private List<Album> getRandom(int count, List<MusicFolder> musicFolders) {
         List<Album> result = new ArrayList<>();
-        for (MediaFile file : searchService.getRandomAlbums(count, musicFolders)) {
+        for (MediaFile file : legacySearch.getRandomAlbums(count, musicFolders)) {
             result.add(createAlbum(file));
         }
         return result;
@@ -288,7 +300,7 @@ public class HomeController {
     private List<Album> getByGenre(int offset, int count, String genre,
             List<MusicFolder> musicFolders) {
         List<Album> result = new ArrayList<>();
-        for (MediaFile file : searchService.getAlbumsByGenres(genre, offset, count, musicFolders)) {
+        for (MediaFile file : legacySearch.getAlbumsByGenres(genre, offset, count, musicFolders)) {
             result.add(createAlbum(file));
         }
         return result;

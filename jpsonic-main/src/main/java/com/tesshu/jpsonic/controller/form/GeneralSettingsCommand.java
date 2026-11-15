@@ -63,8 +63,6 @@ public class GeneralSettingsCommand extends SettingsPageCommons {
 
     // Suppressed legacy features
     private boolean useJsonp;
-    private boolean showIndexDetails;
-    private boolean showDBDetails;
     private boolean useCast;
     private boolean usePartyMode;
 
@@ -247,22 +245,6 @@ public class GeneralSettingsCommand extends SettingsPageCommons {
 
     public void setUseJsonp(boolean useJsonp) {
         this.useJsonp = useJsonp;
-    }
-
-    public boolean isShowIndexDetails() {
-        return showIndexDetails;
-    }
-
-    public void setShowIndexDetails(boolean showIndexDetails) {
-        this.showIndexDetails = showIndexDetails;
-    }
-
-    public boolean isShowDBDetails() {
-        return showDBDetails;
-    }
-
-    public void setShowDBDetails(boolean showDBDetails) {
-        this.showDBDetails = showDBDetails;
     }
 
     public boolean isUseCast() {

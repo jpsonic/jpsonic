@@ -22,14 +22,19 @@ package com.tesshu.jpsonic.persistence.dialect;
 import static com.tesshu.jpsonic.persistence.base.DaoUtils.prefix;
 import static com.tesshu.jpsonic.util.PlayerUtils.FAR_FUTURE;
 
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
+import java.util.stream.Collectors;
 
+import com.tesshu.jpsonic.infrastructure.collection.util.LegacyMap;
 import com.tesshu.jpsonic.infrastructure.db.DatabaseConfiguration.ProfileNameConstants;
 import com.tesshu.jpsonic.persistence.api.entity.MediaFile;
 import com.tesshu.jpsonic.persistence.api.entity.MediaFile.MediaType;
@@ -39,14 +44,13 @@ import com.tesshu.jpsonic.persistence.base.TemplateWrapper;
 import com.tesshu.jpsonic.persistence.result.ArtistSortCandidate;
 import com.tesshu.jpsonic.persistence.result.DuplicateSort;
 import com.tesshu.jpsonic.persistence.result.SortCandidate;
-import com.tesshu.jpsonic.util.LegacyMap;
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Component;
 import org.springframework.util.ObjectUtils;
 
-@SuppressWarnings("PMD.AvoidDuplicateLiterals")
+@SuppressWarnings({ "PMD.AvoidDuplicateLiterals", "PMD.FieldDeclarationsShouldBeAtStartOfClass" })
 @Component
 @Profile({ ProfileNameConstants.URL, ProfileNameConstants.JNDI })
 public class AnsiMediaFileDao implements DialectMediaFileDao {
@@ -601,8 +605,8 @@ public class AnsiMediaFileDao implements DialectMediaFileDao {
     }
 
     @Override
-    public List<MediaFile> getSongsByGenre(final List<String> genres, final int offset,
-            final int count, final List<MusicFolder> musicFolders, List<MediaType> types) {
+    public List<MediaFile> getSongsByGenre(List<String> genres, long offset, long count,
+            List<MusicFolder> musicFolders, List<MediaType> types) {
         if (musicFolders.isEmpty() || genres.isEmpty()) {
             return Collections.emptyList();
         }
@@ -624,5 +628,85 @@ public class AnsiMediaFileDao implements DialectMediaFileDao {
                         folder_order, s.media_file_order, s.track_number
                 limit :count offset :offset
                 """, rowMapper, args);
+    }
+
+    // ############################################################################
+    // Jpsonic domain
+
+    private static final String DOMAIN_JOINED_COLUMNS_QUERY = DaoUtils.DOMAIN_JOINED_COLUMNS_QUERY;
+    private final RowMapper<com.tesshu.jpsonic.domain.model.MediaFile> domainRowMapper = DaoUtils
+        .createRowMapper(com.tesshu.jpsonic.domain.model.MediaFile.class);
+    private final RowMapper<Entry<Integer, com.tesshu.jpsonic.domain.model.MediaFile>> domainIRowMapper = (
+            resultSet, rowNum) -> {
+        return new AbstractMap.SimpleEntry<>(resultSet.getInt("irownum"),
+                domainRowMapper.mapRow(resultSet, rowNum));
+    };
+
+    @Override
+    public List<com.tesshu.jpsonic.domain.model.MediaFile> getDomainRandomSongsForAlbumArtist(
+            int limit, String albumArtist,
+            List<com.tesshu.jpsonic.domain.model.MusicFolder> musicFolders,
+            BiFunction<Integer, Integer, List<Integer>> randomCallback) {
+
+        String type = com.tesshu.jpsonic.domain.model.MediaFile.Type.MUSIC.name();
+
+        /* Run the query twice. */
+
+        /*
+         * Get the number of records that match the conditions, to generate a set of
+         * random numbers according to the number. Therefore, if the number of cases at
+         * this time is too large, the subsequent performance is likely to be affected.
+         * If the number isn't too large, it doesn't matter much.
+         */
+        int countAll = template.queryForInt("""
+                select count(*)
+                from media_file
+                where type = ? and album_artist = ?
+                """, 0, type, albumArtist);
+        if (0 == countAll) {
+            return Collections.emptyList();
+        }
+
+        List<Integer> randomRownum = randomCallback.apply(countAll, limit);
+
+        Map<String, Object> args = LegacyMap
+            .of("type", type, "artist", albumArtist, "randomRownum", randomRownum, "limit", limit);
+
+        /*
+         * Perform a conditional search and add a row number. Returns the result whose
+         * row number is included in the random number set.<p> There are some technical
+         * barriers to this query.<p> (1) It must be a row number acquisition method
+         * that can be executed in all DBs.<br> (2) It is simpler to join using UNNEST.
+         * However, hsqldb traditionally has a problem with UNNEST, and the operation
+         * specification differs depending on the version. In addition, compatibility of
+         * each DB may be affected.<p> Therefore, we use a very primitive query that
+         * combines COUNT and IN here.<p> IN allows you to get the smallest song subset
+         * corresponding to random numbers, but unlike JOIN&UNNEST, the order of random
+         * numbers is destroyed.
+         */
+        List<Entry<Integer, com.tesshu.jpsonic.domain.model.MediaFile>> tmpResult = template
+            .namedQuery("select " + DOMAIN_JOINED_COLUMNS_QUERY + """
+                                , mf.irownum
+                        from
+                            (select
+                                    (select count(id)
+                                    from media_file
+                                    where id < boo.id and type = :type
+                                            and album_artist = :artist) as irownum,
+                                    boo.*
+                            from
+                                    (select *
+                                    from media_file
+                                    where type = :type and album_artist = :artist) boo) as mf
+                            join media_file pmf on mf.parent_path = pmf.path
+                            where mf.irownum in ( :randomRownum )
+                    limit :limit
+                    """, domainIRowMapper, args);
+
+        /* Restore the order lost in IN. */
+        Map<Integer, com.tesshu.jpsonic.domain.model.MediaFile> map = tmpResult
+            .stream()
+            .collect(Collectors.toMap(Entry::getKey, Entry::getValue));
+        return randomRownum.stream().map(map::get).filter(Objects::nonNull).toList();
     }
 }

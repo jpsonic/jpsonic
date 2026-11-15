@@ -113,8 +113,17 @@ public class HsqlDBMediaFileDao implements DialectMediaFileDao {
     }
 
     @Override
-    public List<MediaFile> getSongsByGenre(List<String> genres, int offset, int count,
+    public List<MediaFile> getSongsByGenre(List<String> genres, long offset, long count,
             List<MusicFolder> musicFolders, List<MediaType> types) {
         return deligate.getSongsByGenre(genres, offset, count, musicFolders, types);
+    }
+
+    @Override
+    public List<com.tesshu.jpsonic.domain.model.MediaFile> getDomainRandomSongsForAlbumArtist(
+            int limit, String albumArtist,
+            List<com.tesshu.jpsonic.domain.model.MusicFolder> musicFolders,
+            BiFunction<Integer, Integer, List<Integer>> randomCallback) {
+        return deligate
+            .getDomainRandomSongsForAlbumArtist(limit, albumArtist, musicFolders, randomCallback);
     }
 }

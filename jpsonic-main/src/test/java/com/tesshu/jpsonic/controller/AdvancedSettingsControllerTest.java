@@ -31,13 +31,13 @@ import java.util.concurrent.ExecutionException;
 import com.tesshu.jpsonic.controller.form.AdvancedSettingsCommand;
 import com.tesshu.jpsonic.domain.model.AuthKey;
 import com.tesshu.jpsonic.domain.model.AuthKey.AuthKeyType;
+import com.tesshu.jpsonic.domain.provider.state.ScannerStateProvider;
 import com.tesshu.jpsonic.domain.system.IndexScheme;
 import com.tesshu.jpsonic.feature.auth.rememberme.RememberMeForm;
 import com.tesshu.jpsonic.feature.auth.rememberme.RememberMeKeyManager;
 import com.tesshu.jpsonic.infrastructure.settings.SKeys;
 import com.tesshu.jpsonic.infrastructure.settings.SettingsFacade;
 import com.tesshu.jpsonic.infrastructure.settings.SettingsFacadeBuilder;
-import com.tesshu.jpsonic.service.ScannerStateService;
 import com.tesshu.jpsonic.service.ServiceMockUtils;
 import com.tesshu.jpsonic.service.ShareService;
 import com.tesshu.jpsonic.service.UserService;
@@ -81,7 +81,7 @@ class AdvancedSettingsControllerTest {
         Mockito.when(rememberMeKeyManager.getAuthKey()).thenReturn(authKey);
         controller = new AdvancedSettingsController(settingsFacade, mock(UserService.class),
                 rememberMeKeyManager, mock(ShareService.class), mock(OutlineHelpSelector.class),
-                mock(ScannerStateService.class));
+                mock(ScannerStateProvider.class));
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
 

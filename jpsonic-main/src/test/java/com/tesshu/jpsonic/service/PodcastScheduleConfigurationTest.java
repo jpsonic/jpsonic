@@ -38,6 +38,7 @@ import java.time.temporal.ChronoUnit;
 
 import ch.qos.logback.classic.Level;
 import com.tesshu.jpsonic.TestCaseUtils;
+import com.tesshu.jpsonic.domain.provider.state.ScannerStateProvider;
 import com.tesshu.jpsonic.infrastructure.settings.SKeys;
 import com.tesshu.jpsonic.infrastructure.settings.SettingsFacade;
 import org.junit.jupiter.api.AfterEach;
@@ -56,15 +57,15 @@ class PodcastScheduleConfigurationTest {
     private SettingsFacade settingsFacade;
     private PodcastService podcastService;
     private PodcastScheduleConfiguration configuration;
-    private ScannerStateService scannerStateService;
+    private ScannerStateProvider scannerStateProvider;
 
     @BeforeEach
     void setup() {
         settingsFacade = mock(SettingsFacade.class);
         podcastService = mock(PodcastService.class);
-        scannerStateService = mock(ScannerStateService.class);
+        scannerStateProvider = mock(ScannerStateProvider.class);
         configuration = new PodcastScheduleConfiguration(mock(TaskScheduler.class), settingsFacade,
-                podcastService, scannerStateService);
+                podcastService, scannerStateProvider);
         TestCaseUtils.setLogLevel(PodcastScheduleConfiguration.class, Level.TRACE);
     }
 
@@ -153,7 +154,7 @@ class PodcastScheduleConfigurationTest {
         @Test
         void testExecutionTimeDuringScan() {
 
-            when(scannerStateService.isScanning()).thenReturn(true);
+            when(scannerStateProvider.isScanning()).thenReturn(true);
 
             ScheduledTaskRegistrar registrar = new ScheduledTaskRegistrar();
             configuration.configureTasks(registrar);

@@ -10,9 +10,10 @@
 </c:if>
 
 <c:set var="share" value="${param.existsShare ? 'share ' : ''}"/>
+<c:set var="database" value="${param.useDatabaseSettings ? ' database' : ''}"/>
 <c:set var="categories" value="${param.restricted
 	? 'personal password player'.concat(share)
-	: 'musicFolder general advanced personal user player '.concat(share).concat('dlna transcoding internetRadio database')}"/>
+	: 'musicFolder general advanced personal user player '.concat(share).concat('dlna transcoding internetRadio').concat(database)}"/>
 
 <section>
 	<h1 class="settings"><fmt:message key="settingsheader.title"/></h1>

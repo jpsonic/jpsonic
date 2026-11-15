@@ -31,24 +31,26 @@ import java.util.Map;
 import java.util.Optional;
 
 import com.tesshu.jpsonic.SuppressLint;
+import com.tesshu.jpsonic.domain.model.MusicFolderContent;
+import com.tesshu.jpsonic.domain.provider.resource.MediaFileProvider;
+import com.tesshu.jpsonic.domain.provider.resource.MusicFolderProvider;
+import com.tesshu.jpsonic.domain.provider.resource.MusicIndexProvider;
+import com.tesshu.jpsonic.domain.provider.state.ScannerStateProvider;
 import com.tesshu.jpsonic.domain.system.AvatarScheme;
 import com.tesshu.jpsonic.domain.system.SpeechToTextLangScheme;
 import com.tesshu.jpsonic.feature.i18n.AirsonicLocaleResolver;
+import com.tesshu.jpsonic.infrastructure.collection.util.LegacyMap;
 import com.tesshu.jpsonic.infrastructure.core.EnvironmentProvider;
 import com.tesshu.jpsonic.infrastructure.metadata.BuildInfoProvider;
 import com.tesshu.jpsonic.infrastructure.settings.SKeys;
 import com.tesshu.jpsonic.infrastructure.settings.SettingsFacade;
 import com.tesshu.jpsonic.persistence.api.entity.InternetRadio;
 import com.tesshu.jpsonic.persistence.api.entity.MusicFolder;
-import com.tesshu.jpsonic.persistence.api.entity.MusicFolderContent;
 import com.tesshu.jpsonic.persistence.core.entity.User;
 import com.tesshu.jpsonic.persistence.core.entity.UserSettings;
 import com.tesshu.jpsonic.service.InternetRadioService;
 import com.tesshu.jpsonic.service.MusicFolderService;
-import com.tesshu.jpsonic.service.MusicIndexService;
-import com.tesshu.jpsonic.service.ScannerStateService;
 import com.tesshu.jpsonic.service.UserService;
-import com.tesshu.jpsonic.util.LegacyMap;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,22 +83,27 @@ public class TopController {
     private final SettingsFacade settingsFacade;
     private final MusicFolderService musicFolderService;
     private final UserService userService;
-    private final ScannerStateService scannerStateService;
-    private final MusicIndexService musicIndexService;
+    private final ScannerStateProvider scannerStateProvider;
+    private final MusicFolderProvider musicFolderProvider;
+    private final MusicIndexProvider musicIndexProvider;
+    private final MediaFileProvider mediaFileProvider;
     private final BuildInfoProvider buildInfoProvider;
     private final InternetRadioService internetRadioService;
     private final AirsonicLocaleResolver localeResolver;
 
     public TopController(SettingsFacade settingsFacade, MusicFolderService musicFolderService,
-            UserService userService, ScannerStateService scannerStateService,
-            MusicIndexService musicIndexService, BuildInfoProvider buildInfoProvider,
+            UserService userService, ScannerStateProvider scannerStateProvider,
+            MusicFolderProvider musicFolderProvider, MusicIndexProvider musicIndexProvider,
+            MediaFileProvider mediaFileProvider, BuildInfoProvider buildInfoProvider,
             InternetRadioService internetRadioService, AirsonicLocaleResolver localeResolver) {
         super();
         this.settingsFacade = settingsFacade;
         this.musicFolderService = musicFolderService;
         this.userService = userService;
-        this.scannerStateService = scannerStateService;
-        this.musicIndexService = musicIndexService;
+        this.scannerStateProvider = scannerStateProvider;
+        this.musicFolderProvider = musicFolderProvider;
+        this.musicIndexProvider = musicIndexProvider;
+        this.mediaFileProvider = mediaFileProvider;
         this.buildInfoProvider = buildInfoProvider;
         this.internetRadioService = internetRadioService;
         this.localeResolver = localeResolver;
@@ -138,13 +145,10 @@ public class TopController {
         boolean musicFolderChanged = saveSelectedMusicFolder(request);
         map.put("musicFolderChanged", musicFolderChanged);
         MusicFolder selectedMusicFolder = userService.getSelectedMusicFolder(username);
-        List<MusicFolder> musicFoldersToUse = selectedMusicFolder == null ? allMusicFolders
-                : Collections.singletonList(selectedMusicFolder);
 
         map.put("musicFolders", allMusicFolders);
         map.put("selectedMusicFolder", selectedMusicFolder);
         map.put("radios", internetRadioService.getAllInternetRadios());
-        map.put("shortcuts", musicIndexService.getShortcuts(musicFoldersToUse));
         map.put("partyMode", userSettings.isPartyModeEnabled());
         map.put("alternativeDrawer", userSettings.isAlternativeDrawer());
 
@@ -155,11 +159,18 @@ public class TopController {
         }
         map.put("brand", EnvironmentProvider.getInstance().getBrand());
 
-        MusicFolderContent musicFolderContent = musicIndexService
-            .getMusicFolderContent(musicFoldersToUse);
-        map.put("indexedArtists", musicFolderContent.getIndexedArtists());
-        map.put("singleSongs", musicFolderContent.getSingleSongs());
-        map.put("indexes", musicFolderContent.getIndexedArtists().keySet());
+        List<MusicFolder> musicFoldersToUse = selectedMusicFolder == null ? allMusicFolders
+                : Collections.singletonList(selectedMusicFolder);
+        List<com.tesshu.jpsonic.domain.model.MusicFolder> folders = musicFoldersToUse
+            .stream()
+            .map(MusicFolder::getId)
+            .map(musicFolderProvider::requireMusicFolder)
+            .toList();
+        MusicFolderContent musicFolderContent = musicIndexProvider.findMusicFolderContent(folders);
+        map.put("shortcuts", mediaFileProvider.findShortcuts(folders));
+        map.put("indexedArtists", musicFolderContent.indexedArtists());
+        map.put("singleSongs", musicFolderContent.singleSongs());
+        map.put("indexes", musicFolderContent.indexedArtists().keySet());
         map.put("user", userService.getCurrentUserStrict(request));
         mainView.ifPresent(v -> {
             if (validateMainViewName(v)) {
@@ -167,7 +178,7 @@ public class TopController {
             }
         });
         selectedItem.ifPresent(v -> map.put("selectedItem", v));
-        selectedItem.ifPresent(v -> map.put("scanning", scannerStateService.isScanning()));
+        selectedItem.ifPresent(v -> map.put("scanning", scannerStateProvider.isScanning()));
 
         return new ModelAndView("top", "model", map);
     }
@@ -182,7 +193,7 @@ public class TopController {
     public long getLastModified(HttpServletRequest request) throws ServletRequestBindingException {
         saveSelectedMusicFolder(request);
 
-        if (scannerStateService.isScanning()) {
+        if (scannerStateProvider.isScanning()) {
             return -1L;
         }
 

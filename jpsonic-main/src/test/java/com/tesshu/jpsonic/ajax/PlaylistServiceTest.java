@@ -27,9 +27,10 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 import java.util.regex.Pattern;
 
+import com.tesshu.jpsonic.domain.provider.resource.ServerLocaleProvider;
 import com.tesshu.jpsonic.feature.filesystem.LibraryAccessPolicy;
 import com.tesshu.jpsonic.feature.i18n.AirsonicLocaleResolver;
-import com.tesshu.jpsonic.feature.i18n.ServerLocaleService;
+import com.tesshu.jpsonic.infrastructure.locale.ServerLocaleManager;
 import com.tesshu.jpsonic.infrastructure.settings.SettingsFacade;
 import com.tesshu.jpsonic.infrastructure.settings.SettingsFacadeBuilder;
 import com.tesshu.jpsonic.persistence.api.entity.PlayQueue;
@@ -58,10 +59,10 @@ class PlaylistServiceTest {
     @BeforeEach
     void setup() {
         SettingsFacade settingsFacade = SettingsFacadeBuilder.create().buildWithDefault();
-        ServerLocaleService serverLocaleService = new ServerLocaleService(settingsFacade);
+        ServerLocaleProvider serverLocaleProvider = new ServerLocaleManager(settingsFacade);
         UserService userService = mock(UserService.class);
         AirsonicLocaleResolver airsonicLocaleResolver = new AirsonicLocaleResolver(userService,
-                serverLocaleService);
+                serverLocaleProvider);
         deligate = mock(com.tesshu.jpsonic.service.PlaylistService.class);
         playerService = mock(PlayerService.class);
         playlistService = new PlaylistService(mock(MusicFolderService.class),

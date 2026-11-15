@@ -24,6 +24,7 @@ package com.tesshu.jpsonic.feature.stream;
 import static com.tesshu.jpsonic.service.ServiceMockUtils.mock;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -38,6 +39,7 @@ import java.util.List;
 import com.tesshu.jpsonic.controller.Attributes;
 import com.tesshu.jpsonic.domain.system.PreferredFormatScheme;
 import com.tesshu.jpsonic.feature.auth.jwt.JWTAuthenticationToken;
+import com.tesshu.jpsonic.infrastructure.scanner.WritableMediaFileService;
 import com.tesshu.jpsonic.infrastructure.settings.SKeys;
 import com.tesshu.jpsonic.infrastructure.settings.SettingsFacade;
 import com.tesshu.jpsonic.infrastructure.settings.SettingsFacadeBuilder;
@@ -53,7 +55,6 @@ import com.tesshu.jpsonic.service.StatusService.TransferStatus;
 import com.tesshu.jpsonic.service.TranscodingService;
 import com.tesshu.jpsonic.service.TranscodingService.VideoTranscodingSettings;
 import com.tesshu.jpsonic.service.UserService;
-import com.tesshu.jpsonic.service.scanner.WritableMediaFileService;
 import org.junit.Ignore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.ClassOrderer;
@@ -641,7 +642,7 @@ class StreamServiceTest {
         try (InputStream inputStream = streamService
             .createInputStream(player, null, null, null, null)) {
             assertNotNull(inputStream);
-            assertTrue(inputStream instanceof PlayQueueInputStream);
+            assertInstanceOf(PlayQueueInputStream.class, inputStream);
         }
     }
 

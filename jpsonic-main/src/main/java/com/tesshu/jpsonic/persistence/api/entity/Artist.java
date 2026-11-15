@@ -22,11 +22,13 @@
 package com.tesshu.jpsonic.persistence.api.entity;
 
 import java.time.Instant;
+import java.util.Optional;
 
-import com.tesshu.jpsonic.persistence.contract.Indexable;
-import com.tesshu.jpsonic.persistence.contract.Orderable;
+import com.tesshu.jpsonic.domain.contract.Indexable;
+import com.tesshu.jpsonic.domain.contract.Orderable;
 import org.checkerframework.checker.nullness.qual.NonNull;
 
+@SuppressWarnings("PMD.AvoidFieldNameMatchingMethodName")
 public final class Artist implements Orderable, Indexable {
 
     private int id;
@@ -70,8 +72,12 @@ public final class Artist implements Orderable, Indexable {
         this.id = id;
     }
 
-    @Override
     public @NonNull String getName() {
+        return name;
+    }
+
+    @Override
+    public @NonNull String name() {
         return name;
     }
 
@@ -127,8 +133,12 @@ public final class Artist implements Orderable, Indexable {
         this.sort = sort;
     }
 
-    @Override
     public String getReading() {
+        return reading;
+    }
+
+    @Override
+    public String reading() {
         return reading;
     }
 
@@ -146,9 +156,13 @@ public final class Artist implements Orderable, Indexable {
         this.order = order;
     }
 
-    @Override
     public String getMusicIndex() {
         return musicIndex;
+    }
+
+    @Override
+    public Optional<String> musicIndex() {
+        return Optional.ofNullable(musicIndex);
     }
 
     public void setMusicIndex(String musicIndex) {

@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
+import com.tesshu.jpsonic.infrastructure.collection.util.LegacyMap;
 import com.tesshu.jpsonic.persistence.api.entity.MediaFile;
 import com.tesshu.jpsonic.persistence.api.entity.MusicFolder;
 import com.tesshu.jpsonic.persistence.base.TemplateWrapper;
@@ -37,7 +38,6 @@ import com.tesshu.jpsonic.persistence.core.entity.ScanEvent;
 import com.tesshu.jpsonic.persistence.core.entity.ScanEvent.ScanEventType;
 import com.tesshu.jpsonic.persistence.core.entity.ScanLog;
 import com.tesshu.jpsonic.persistence.core.entity.ScanLog.ScanLogType;
-import com.tesshu.jpsonic.util.LegacyMap;
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;

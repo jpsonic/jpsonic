@@ -43,6 +43,7 @@ import org.springframework.stereotype.Repository;
  * @author Sindre Mehus
  */
 @Repository
+@SuppressWarnings("PMD.AvoidDuplicateLiterals")
 public class MusicFolderDao {
 
     private static final Logger LOG = LoggerFactory.getLogger(MusicFolderDao.class);
@@ -55,6 +56,12 @@ public class MusicFolderDao {
     private final RowMapper<MusicFolder> rowMapper = (rs, rowNum) -> new MusicFolder(rs.getInt(1),
             rs.getString(2), rs.getString(3), rs.getBoolean(4),
             nullableInstantOf(rs.getTimestamp(5)), rs.getInt(6), rs.getBoolean(7));
+
+    private final RowMapper<com.tesshu.jpsonic.domain.model.MusicFolder> domainRowMapper = (rs,
+            rowNum) -> new com.tesshu.jpsonic.domain.model.MusicFolder(rs.getInt(1),
+                    rs.getString(2), rs.getString(3), rs.getBoolean(4),
+                    nullableInstantOf(rs.getTimestamp(5)), rs.getInt(6), rs.getBoolean(7));
+
     private final UserDao userDao;
 
     public MusicFolderDao(TemplateWrapper templateWrapper, UserDao userDao) {
@@ -121,6 +128,22 @@ public class MusicFolderDao {
                     defaultIfNull(musicFolder.getFolderOrder(),
                             template.queryForInt("select count(*) from music_folder", -1)),
                     musicFolder.isArchived(), musicFolder.getId());
+    }
+
+    public com.tesshu.jpsonic.domain.model.MusicFolder getDomainMusicFolders(int id) {
+        String sql = "select " + QUERY_COLUMNS + " from music_folder where music_folder.id = ?";
+        return template.queryOne(sql, domainRowMapper, id);
+    }
+
+    public List<com.tesshu.jpsonic.domain.model.MusicFolder> getDomainMusicFoldersForUser(
+            String username) {
+        String sql = "select " + prefix(QUERY_COLUMNS, "music_folder") + """
+                from music_folder, music_folder_user
+                where music_folder.id = music_folder_user.music_folder_id
+                        and music_folder_user.username = ?
+                order by enabled desc, folder_order
+                """;
+        return template.query(sql, domainRowMapper, username);
     }
 
     public List<MusicFolder> getMusicFoldersForUser(String username) {

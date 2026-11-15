@@ -237,7 +237,7 @@ window.onOpenDialogVideoPlayer = function(videoUrl) {
                                 <sub:url value="main.view" var="mainUrl">
                                     <sub:param name="id" value="${artist.id}" />
                                 </sub:url>
-                                <li><a target="main" href="${mainUrl}" title="${artist.artistReading}"><sub:truncateNicely upper="${18}" lower="${25}">${fn:escapeXml(artist.name)}</sub:truncateNicely></a></li>
+                                <li><a target="main" href="${mainUrl}" title="${artist.reading}"><sub:truncateNicely upper="${18}" lower="${25}">${fn:escapeXml(artist.name)}</sub:truncateNicely></a></li>
                             </c:forEach>
                         </ul>
                         </li>

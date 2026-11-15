@@ -23,7 +23,7 @@ package com.tesshu.jpsonic.persistence.api.entity;
 
 import java.time.Instant;
 
-import com.tesshu.jpsonic.persistence.contract.Orderable;
+import com.tesshu.jpsonic.domain.contract.Orderable;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 public final class Album implements Orderable {

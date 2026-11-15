@@ -31,6 +31,7 @@ import com.tesshu.jpsonic.SuppressFBWarnings;
 import com.tesshu.jpsonic.controller.form.MusicFolderSettingsCommand;
 import com.tesshu.jpsonic.infrastructure.filesystem.FileSystemSKeys;
 import com.tesshu.jpsonic.infrastructure.filesystem.RootPathEntryGuard;
+import com.tesshu.jpsonic.infrastructure.scanner.MusicFolderServiceImpl;
 import com.tesshu.jpsonic.infrastructure.settings.SKeys;
 import com.tesshu.jpsonic.infrastructure.settings.SettingsFacade;
 import com.tesshu.jpsonic.persistence.api.entity.MusicFolder;
@@ -39,7 +40,6 @@ import com.tesshu.jpsonic.persistence.core.entity.UserSettings;
 import com.tesshu.jpsonic.service.MediaScannerService;
 import com.tesshu.jpsonic.service.ShareService;
 import com.tesshu.jpsonic.service.UserService;
-import com.tesshu.jpsonic.service.scanner.MusicFolderServiceImpl;
 import jakarta.servlet.http.HttpServletRequest;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Controller;
@@ -131,6 +131,8 @@ public class MusicFolderSettingsController {
 
         // for view page control
         command.setUseRadio(settingsFacade.get(SKeys.general.legacy.useRadio));
+        command
+            .setUseDatabaseSettings(settingsFacade.get(SKeys.general.legacy.useDatabaseSettings));
         toast.ifPresent(command::setShowToast);
         command.setShareCount(shareService.getAllShares().size());
 

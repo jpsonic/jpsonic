@@ -69,8 +69,8 @@ public class ApplicationSecurity extends GlobalAuthenticationConfigurerAdapter {
     public static class AuthenticationManagerConfig {
 
         @Autowired
-        public void configure(SettingsFacade settingsFacade, SettingsFacade settings,
-                UserService userService, AuthenticationManagerBuilder auth,
+        public void configure(SettingsFacade settingsFacade, UserService userService,
+                AuthenticationManagerBuilder auth,
                 CustomUserDetailsContextMapper customUserDetailsContextMapper) throws Exception {
             if (settingsFacade.get(SKeys.advanced.ldap.enabled)) {
                 auth
@@ -86,11 +86,11 @@ public class ApplicationSecurity extends GlobalAuthenticationConfigurerAdapter {
             }
             auth.userDetailsService(userService);
 
-            String jwtKey = settings.get(SystemSKeys.deprecatedSecrets.jwtKey);
+            String jwtKey = settingsFacade.get(SystemSKeys.deprecatedSecrets.jwtKey);
             if (StringUtils.isBlank(jwtKey)) {
                 LoggerFactory.getLogger(ApplicationSecurity.class).warn("Generating new jwt key");
                 jwtKey = JWTSecurityService.generateKey();
-                settings.commit(SystemSKeys.deprecatedSecrets.jwtKey, jwtKey);
+                settingsFacade.commit(SystemSKeys.deprecatedSecrets.jwtKey, jwtKey);
             }
             auth.authenticationProvider(new JWTAuthenticationProvider(jwtKey));
         }

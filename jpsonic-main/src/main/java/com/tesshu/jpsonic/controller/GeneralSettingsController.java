@@ -27,17 +27,17 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import com.tesshu.jpsonic.controller.form.GeneralSettingsCommand;
+import com.tesshu.jpsonic.domain.provider.resource.MusicIndexProvider;
+import com.tesshu.jpsonic.domain.provider.state.ScannerStateProvider;
 import com.tesshu.jpsonic.domain.system.IndexScheme;
-import com.tesshu.jpsonic.feature.i18n.ServerLocaleService;
 import com.tesshu.jpsonic.feature.theme.ServerThemeService;
 import com.tesshu.jpsonic.feature.theme.Theme;
 import com.tesshu.jpsonic.infrastructure.filesystem.RootPathEntryGuard;
+import com.tesshu.jpsonic.infrastructure.locale.ServerLocaleManager;
 import com.tesshu.jpsonic.infrastructure.settings.SKeys;
 import com.tesshu.jpsonic.infrastructure.settings.SettingsFacade;
 import com.tesshu.jpsonic.persistence.core.entity.User;
 import com.tesshu.jpsonic.persistence.core.entity.UserSettings;
-import com.tesshu.jpsonic.service.MusicIndexService;
-import com.tesshu.jpsonic.service.ScannerStateService;
 import com.tesshu.jpsonic.service.ShareService;
 import com.tesshu.jpsonic.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -80,26 +80,26 @@ public class GeneralSettingsController {
 
     private final SettingsFacade settingsFacade;
     private final UserService userService;
-    private final ServerLocaleService serverLocaleService;
+    private final ServerLocaleManager serverLocaleManager;
     private final ServerThemeService serverThemeService;
     private final ShareService shareService;
     private final OutlineHelpSelector outlineHelpSelector;
-    private final ScannerStateService scannerStateService;
-    private final MusicIndexService musicIndexService;
+    private final ScannerStateProvider scannerStateProvider;
+    private final MusicIndexProvider musicIndexProvider;
 
     public GeneralSettingsController(SettingsFacade settingsFacade, UserService userService,
-            ServerLocaleService serverLocaleService, ServerThemeService serverThemeService,
+            ServerLocaleManager serverLocaleManager, ServerThemeService serverThemeService,
             ShareService shareService, OutlineHelpSelector outlineHelpSelector,
-            ScannerStateService scannerStateService, MusicIndexService musicIndexService) {
+            ScannerStateProvider scannerStateProvider, MusicIndexProvider musicIndexProvider) {
         super();
         this.settingsFacade = settingsFacade;
         this.userService = userService;
-        this.serverLocaleService = serverLocaleService;
+        this.serverLocaleManager = serverLocaleManager;
         this.serverThemeService = serverThemeService;
         this.shareService = shareService;
         this.outlineHelpSelector = outlineHelpSelector;
-        this.scannerStateService = scannerStateService;
-        this.musicIndexService = musicIndexService;
+        this.scannerStateProvider = scannerStateProvider;
+        this.musicIndexProvider = musicIndexProvider;
     }
 
     @ModelAttribute
@@ -116,10 +116,10 @@ public class GeneralSettingsController {
             .ifPresent(theme -> command.setThemeIndex(String.valueOf(themes.indexOf(theme))));
         command.setThemes(themes);
 
-        List<Locale> locales = serverLocaleService.getAvailableLocales();
+        List<Locale> locales = serverLocaleManager.getAvailableLocales();
         locales
             .stream()
-            .filter(locale -> locale.equals(serverLocaleService.getLocale()))
+            .filter(locale -> locale.equals(serverLocaleManager.getLocale()))
             .findFirst()
             .ifPresent(locale -> command.setLocaleIndex(String.valueOf(locales.indexOf(locale))));
         command
@@ -151,8 +151,6 @@ public class GeneralSettingsController {
 
         // Suppressed legacy features
         command.setUseJsonp(settingsFacade.get(SKeys.general.legacy.useJsonp));
-        command.setShowIndexDetails(settingsFacade.get(SKeys.general.legacy.showIndexDetails));
-        command.setShowDBDetails(settingsFacade.get(SKeys.general.legacy.showDbDetails));
         command.setUseCast(settingsFacade.get(SKeys.general.legacy.useCast));
         command.setUsePartyMode(settingsFacade.get(SKeys.general.legacy.usePartyMode));
 
@@ -187,6 +185,8 @@ public class GeneralSettingsController {
 
         // for view page control
         command.setUseRadio(settingsFacade.get(SKeys.general.legacy.useRadio));
+        command
+            .setUseDatabaseSettings(settingsFacade.get(SKeys.general.legacy.useDatabaseSettings));
         User user = userService.getCurrentUserStrict(request);
         command
             .setShowOutlineHelp(outlineHelpSelector.isShowOutlineHelp(request, user.getUsername()));
@@ -194,7 +194,7 @@ public class GeneralSettingsController {
         command.setShareCount(shareService.getAllShares().size());
         UserSettings userSettings = userService.getUserSettings(user.getUsername());
         command.setOpenDetailSetting(userSettings.isOpenDetailSetting());
-        command.setScanning(scannerStateService.isScanning());
+        command.setScanning(scannerStateProvider.isScanning());
 
         model.addAttribute(Attributes.Model.Command.VALUE, command);
     }
@@ -214,7 +214,7 @@ public class GeneralSettingsController {
         int themeIndex = Integer.parseInt(command.getThemeIndex());
         Theme theme = serverThemeService.getAvailableThemes().get(themeIndex);
         int localeIndex = Integer.parseInt(command.getLocaleIndex());
-        Locale locale = serverLocaleService.getAvailableLocales().get(localeIndex);
+        Locale locale = serverLocaleManager.getAvailableLocales().get(localeIndex);
 
         /*
          * To transition the mainframe after reloading the entire web page, not a simple
@@ -230,18 +230,18 @@ public class GeneralSettingsController {
                     .get(SKeys.general.extension.shortcuts)
                     .equals(command.getShortcuts())
                 || !serverThemeService.getThemeId().equals(theme.getId())
-                || !serverLocaleService.getLocale().equals(locale);
+                || !serverLocaleManager.getLocale().equals(locale);
         redirectAttributes.addFlashAttribute(Attributes.Redirect.RELOAD_FLAG.value(), isReload);
 
         serverThemeService.stagingThemeId(theme.getId());
-        serverLocaleService.stagingLocale(locale);
+        serverLocaleManager.stagingLocale(locale);
 
         // Index settings
         if (settingsFacade.get(SKeys.general.index.indexString) != null && !command
             .getIndex()
             .equals(settingsFacade.get(SKeys.general.index.indexString))) {
             settingsFacade.staging(SKeys.general.index.indexString, command.getIndex());
-            musicIndexService.clear();
+            musicIndexProvider.invalidate();
         }
         settingsFacade.staging(SKeys.general.index.ignoredArticles, command.getIgnoredArticles());
 
@@ -273,15 +273,14 @@ public class GeneralSettingsController {
 
         // Suppressed legacy features
         settingsFacade.staging(SKeys.general.legacy.useRadio, command.isUseRadio());
+        settingsFacade
+            .staging(SKeys.general.legacy.useDatabaseSettings, command.isUseDatabaseSettings());
         settingsFacade.staging(SKeys.general.legacy.useJsonp, command.isUseJsonp());
-        settingsFacade.staging(SKeys.general.legacy.showIndexDetails, command.isShowIndexDetails());
-        settingsFacade.staging(SKeys.general.legacy.showDbDetails, command.isShowDBDetails());
         settingsFacade.staging(SKeys.general.legacy.useCast, command.isUseCast());
-        settingsFacade.staging(SKeys.general.legacy.usePartyMode, command.isUsePartyMode());
         settingsFacade.staging(SKeys.general.legacy.usePartyMode, command.isUsePartyMode());
 
         // Extensions and shortcuts
-        if (!scannerStateService.isScanning()) {
+        if (!scannerStateProvider.isScanning()) {
 
             settingsFacade
                 .staging(SKeys.general.extension.musicFileTypes, command.getMusicFileTypes());

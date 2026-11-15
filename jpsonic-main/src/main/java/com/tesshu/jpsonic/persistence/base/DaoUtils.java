@@ -51,6 +51,37 @@ public final class DaoUtils {
             mb_release_id, artist_sort, name_sort, artist_reading, name_reading, album_order\s
             """;
 
+    public static final String DOMAIN_JOINED_COLUMNS_QUERY = """
+            mf.id, mf.path, pmf.id, mf.format, mf.type, mf.bit_rate, mf.duration_seconds,
+            mf.file_size, mf.artist, mf.album, mf.title, mf.album_artist, mf.track_number, mf.genre, mf.year,
+            mf.cover_art_path, mf.composer,\s
+            case mf.type
+                when 'DIRECTORY' then mf.artist_reading
+                when 'ALBUM' then mf.album_reading
+                else ''
+            end as reading,
+            mf.music_index, mf.comment\s
+            """;
+    public static final String DOMAIN_JOINED_TABLES_QUERY = """
+            from media_file mf
+            left join media_file pmf on mf.parent_path = pmf.path\s
+            """;
+
+    public static final String DOMAIN_ROOT_COLUMNS_QUERY = """
+            mf.id, mf.path, null, mf.format, mf.type, mf.bit_rate, mf.duration_seconds,
+            mf.file_size, mf.artist, mf.album, mf.title, mf.album_artist, mf.track_number, mf.genre, mf.year,
+            mf.cover_art_path, mf.composer,
+            case mf.type
+                when 'DIRECTORY' then mf.artist_reading
+                when 'ALBUM' then mf.album_reading
+                else ''
+            end as reading,
+            mf.music_index, mf.comment\s
+            """;
+    public static final String DOMAIN_ROOT_TABLES_QUERY = """
+            from media_file mf\s
+            """;
+
     private DaoUtils() {
     }
 
@@ -113,9 +144,10 @@ public final class DaoUtils {
     }
 
     private static RowMapper<com.tesshu.jpsonic.domain.model.MediaFile> createDomainMediaFileRowMapper() {
-        return (rs, num) -> new com.tesshu.jpsonic.domain.model.MediaFile(rs.getInt(1), // id
-                rs.getInt(2), // folderId
-                rs.getString(3), // path
+        return (rs, num) -> new com.tesshu.jpsonic.domain.model.MediaFile(//
+                rs.getInt(1), // id
+                rs.getString(2), // pathString
+                rs.getObject(3, Integer.class), // parentId
                 rs.getString(4), // format
                 rs.getString(5), // type
                 rs.getInt(6), // bitRate
@@ -123,7 +155,16 @@ public final class DaoUtils {
                 rs.getLong(8), // fileSize
                 rs.getString(9), // artist
                 rs.getString(10), // album
-                rs.getString(11) // title
+                rs.getString(11), // title
+                rs.getString(12), // albumArtist
+                rs.getInt(13), // trackNumber
+                rs.getString(14), // genre
+                rs.getInt(15), // year
+                rs.getString(16), // coverArtPathString
+                rs.getString(17), // composer
+                rs.getString(18), // reading
+                rs.getString(19), // musicIndex
+                rs.getString(20) // comment,
         );
     }
 

@@ -31,7 +31,6 @@ import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -43,13 +42,13 @@ import java.util.TreeMap;
 import java.util.stream.Stream;
 
 import com.tesshu.jpsonic.SuppressFBWarnings;
+import com.tesshu.jpsonic.domain.language.StringUtil;
+import com.tesshu.jpsonic.infrastructure.collection.util.LegacyMap;
 import com.tesshu.jpsonic.infrastructure.core.EnvironmentProvider;
 import com.tesshu.jpsonic.infrastructure.core.EnvironmentProvider.DirectoryInfo;
 import com.tesshu.jpsonic.infrastructure.core.EnvironmentProvider.LocaleInfo;
 import com.tesshu.jpsonic.infrastructure.db.DatabaseConfiguration.ProfileNameConstants;
 import com.tesshu.jpsonic.infrastructure.filesystem.PathInspector;
-import com.tesshu.jpsonic.infrastructure.settings.SKeys;
-import com.tesshu.jpsonic.infrastructure.settings.SettingsFacade;
 import com.tesshu.jpsonic.persistence.api.entity.MusicFolder;
 import com.tesshu.jpsonic.persistence.base.DaoHelper;
 import com.tesshu.jpsonic.persistence.core.entity.MediaLibraryStatistics;
@@ -57,13 +56,7 @@ import com.tesshu.jpsonic.persistence.core.repository.StaticsDao;
 import com.tesshu.jpsonic.service.MusicFolderService;
 import com.tesshu.jpsonic.service.UserService;
 import com.tesshu.jpsonic.service.metadata.FFmpeg;
-import com.tesshu.jpsonic.service.search.IndexManager;
-import com.tesshu.jpsonic.service.search.IndexType;
-import com.tesshu.jpsonic.util.LegacyMap;
-import com.tesshu.jpsonic.util.StringUtil;
 import jakarta.servlet.http.HttpServletRequest;
-import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.util.Version;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -84,25 +77,19 @@ import org.springframework.web.servlet.ModelAndView;
 public class InternalHelpController {
 
     private static final Logger LOG = LoggerFactory.getLogger(InternalHelpController.class);
-    private static final String TABLE_TYPE_TABLE = "table";
 
-    private final SettingsFacade settingsFacade;
     private final MusicFolderService musicFolderService;
     private final UserService userService;
-    private final IndexManager indexManager;
     private final DaoHelper daoHelper;
     private final Environment environment;
     private final StaticsDao staticsDao;
     private final FFmpeg ffmpeg;
 
-    public InternalHelpController(SettingsFacade settingsFacade, UserService userService,
-            MusicFolderService musicFolderService, IndexManager indexManager, DaoHelper daoHelper,
-            Environment environment, StaticsDao staticsDao, FFmpeg ffmpeg) {
+    public InternalHelpController(UserService userService, MusicFolderService musicFolderService,
+            DaoHelper daoHelper, Environment environment, StaticsDao staticsDao, FFmpeg ffmpeg) {
         super();
-        this.settingsFacade = settingsFacade;
         this.userService = userService;
         this.musicFolderService = musicFolderService;
-        this.indexManager = indexManager;
         this.daoHelper = daoHelper;
         this.environment = environment;
         this.staticsDao = staticsDao;
@@ -124,11 +111,8 @@ public class InternalHelpController {
         gatherFilesystemInfo(map);
         gatherTranscodingInfo(map);
         gatherLocaleInfo(map);
-        gatherIndexInfo(map);
+        map.put("indexLuceneVersion", Version.getPackageImplementationVersion());
         gatherStats(map);
-
-        map.put("showIndexDetails", settingsFacade.get(SKeys.general.legacy.showIndexDetails));
-        map.put("showDBDetails", settingsFacade.get(SKeys.general.legacy.showDbDetails));
 
         return new ModelAndView("internalhelp", "model", map);
     }
@@ -160,44 +144,13 @@ public class InternalHelpController {
                             LocalDateTime.ofInstant(stat.getExecuted(), ZoneId.systemDefault()),
                             folder.getName(), stat.getArtistCount(), stat.getAlbumCount(),
                             stat.getSongCount(), stat.getVideoCount(),
-                            StringUtil.formatDurationHMMSS(stat.getTotalDuration()),
+                            com.tesshu.jpsonic.util.StringUtil
+                                .formatDurationHMMSS(stat.getTotalDuration()),
                             PathInspector.byteCountToDisplaySize(stat.getTotalSize()));
                     result.add(vo);
                 });
         });
         map.put("stats", result);
-    }
-
-    @SuppressWarnings({ "PMD.CloseResource", "PMD.AvoidInstantiatingObjectsInLoops" })
-    /*
-     * [CloseResource] False positive. SearcherManager inherits Closeable but
-     * ensures each searcher is closed only once all threads have finished using it.
-     * Use release instead of close for reuse. No explicit close is done here.
-     * [AvoidInstantiatingObjectsInLoops] (IndexStatistics) Not reusable
-     */
-    private void gatherIndexInfo(Map<String, Object> map) {
-        map.put("indexLuceneVersion", Version.getPackageImplementationVersion());
-        if (!settingsFacade.get(SKeys.general.legacy.showIndexDetails)) {
-            return;
-        }
-
-        SortedMap<String, IndexStatistics> indexStats = new TreeMap<>();
-        for (IndexType indexType : IndexType.values()) {
-            IndexStatistics stat = new IndexStatistics();
-            IndexSearcher searcher = indexManager.getSearcher(indexType);
-            stat.setName(indexType.name());
-            indexStats.put(indexType.name(), stat);
-            if (searcher == null) {
-                stat.setCount(0);
-                stat.setDeletedCount(0);
-            } else {
-                IndexReader reader = searcher.getIndexReader();
-                stat.setCount(reader.numDocs());
-                stat.setDeletedCount(reader.numDeletedDocs());
-                indexManager.release(indexType, searcher);
-            }
-        }
-        map.put("indexStatistics", indexStats);
     }
 
     /**
@@ -241,51 +194,16 @@ public class InternalHelpController {
     @SuppressFBWarnings(value = { "CRLF_INJECTION_LOGS",
             "SQL_INJECTION_SPRING_JDBC" }, justification = "False positive. find-sec-bugs#614/find-sec-bugs#385")
     private void gatherDatabaseInfo(Map<String, Object> map) {
-
         try (Connection conn = daoHelper.getDataSource().getConnection()) {
-
             // Driver name/version
             map.put("dbDriverName", conn.getMetaData().getDriverName());
             map.put("dbDriverVersion", conn.getMetaData().getDriverVersion());
             map.put("dbServerVersion", conn.getMetaData().getDatabaseProductVersion());
-
-            if (!settingsFacade.get(SKeys.general.legacy.showDbDetails)) {
-                return;
-            }
-
-            // Gather information for existing database tables
-            try (ResultSet resultSet = conn.getMetaData().getTables(null, null, "%", null)) {
-
-                SortedMap<String, Long> dbTableCount = new TreeMap<>();
-                while (resultSet.next()) {
-                    String tableSchema = resultSet.getString("TABLE_SCHEM");
-                    String tableName = resultSet.getString("TABLE_NAME");
-                    String tableType = resultSet.getString("TABLE_TYPE");
-                    if (LOG.isDebugEnabled()) {
-                        LOG
-                            .debug("Got database table {}, schema {}, type {}", tableName,
-                                    tableSchema, tableType);
-                    }
-                    if (!TABLE_TYPE_TABLE.equalsIgnoreCase(tableType)) {
-                        continue; // Table type
-                    }
-                    // MariaDB has "null" schemas, while other databases use "public".
-                    if (tableSchema != null && !"public".equalsIgnoreCase(tableSchema)) {
-                        continue; // Table schema
-                    }
-                    Long tableCount = daoHelper
-                        .getJdbcTemplate()
-                        .queryForObject("SELECT count(*) FROM %s".formatted(tableName), Long.class);
-                    dbTableCount.put(tableName, tableCount);
-                }
-                map.put("dbTableCount", dbTableCount);
-            }
         } catch (SQLException e) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Unable to gather information", e);
             }
         }
-
         putDatabaseLegacyInfoTo(map);
     }
 
@@ -390,36 +308,6 @@ public class InternalHelpController {
             version = ffmpeg.getVersion();
         }
         map.put("ffmpegVersion", formatFFmpegVersion(version));
-    }
-
-    public static class IndexStatistics {
-        private String name;
-        private int count;
-        private int deletedCount;
-
-        public String getName() {
-            return name;
-        }
-
-        public void setName(String name) {
-            this.name = name;
-        }
-
-        public int getCount() {
-            return count;
-        }
-
-        public void setCount(int count) {
-            this.count = count;
-        }
-
-        public int getDeletedCount() {
-            return deletedCount;
-        }
-
-        public void setDeletedCount(int deletedCount) {
-            this.deletedCount = deletedCount;
-        }
     }
 
     public static class FileStatistics {

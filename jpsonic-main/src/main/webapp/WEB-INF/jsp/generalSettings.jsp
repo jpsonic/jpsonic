@@ -24,6 +24,7 @@ function resetLegacyFeatures() {
     $('[name="showRememberMe"]').prop('checked', false);
     $('[name="useRadio"]').prop('checked', false);
     $('[name="useJsonp"]').prop('checked', false);
+    $('[name="useDatabaseSettings"]').prop('checked', false);
     $('[name="showIndexDetails"]').prop('checked', false);
     $('[name="showDBDetails"]').prop('checked', false);
     $('[name="useCast"]').prop('checked', false);
@@ -49,6 +50,7 @@ function resetExtension() {
     <c:param name="cat" value="general"/>
     <c:param name="toast" value="${settings_toast or command.showToast}"/>
     <c:param name="useRadio" value="${command.useRadio}"/>
+    <c:param name="useDatabaseSettings" value="${command.useDatabaseSettings}"/>
     <c:param name="existsShare" value="${command.shareCount ne 0}"/>
 </c:import>
 
@@ -220,15 +222,9 @@ function resetExtension() {
             </dd>
             <dt><strong>Deprecated. Will be removed.</strong></dt>
             <dd>
-                <form:checkbox path="showIndexDetails" id="showIndexDetails"/>
-                <label for="showIndexDetails"><fmt:message key="generalsettings.showindexdetails"/></label>
-                <c:import url="helpToolTip.jsp"><c:param name="topic" value="showindexdetails"/></c:import>
-            </dd>
-            <dt><strong>Deprecated. Will be removed.</strong></dt>
-            <dd>
-                <form:checkbox path="showDBDetails" id="showDBDetails"/>
-                <label for="showDBDetails"><fmt:message key="generalsettings.showdbdetails"/></label>
-                <c:import url="helpToolTip.jsp"><c:param name="topic" value="showdbdetails"/></c:import>
+                <form:checkbox path="useDatabaseSettings" id="useDatabaseSettings"/>
+                <label for="useDatabaseSettings"><fmt:message key="generalsettings.useDatabaseSettings"/></label>
+                <c:import url="helpToolTip.jsp"><c:param name="topic" value="useDatabaseSettings"/></c:import>
             </dd>
             <dt><strong>Deprecated. Will be removed.</strong></dt>
             <dd>

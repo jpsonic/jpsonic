@@ -30,6 +30,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.tesshu.jpsonic.infrastructure.collection.util.LegacyMap;
 import com.tesshu.jpsonic.infrastructure.settings.SKeys;
 import com.tesshu.jpsonic.infrastructure.settings.SettingsFacade;
 import com.tesshu.jpsonic.persistence.api.entity.MediaFile;
@@ -40,7 +41,6 @@ import com.tesshu.jpsonic.service.MediaFileService;
 import com.tesshu.jpsonic.service.MusicFolderService;
 import com.tesshu.jpsonic.service.ShareService;
 import com.tesshu.jpsonic.service.UserService;
-import com.tesshu.jpsonic.util.LegacyMap;
 import jakarta.servlet.http.HttpServletRequest;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Controller;
@@ -81,13 +81,14 @@ public class ShareSettingsController {
 
     @GetMapping
     public String doGet(HttpServletRequest request, Model model) {
-        model
-            .addAttribute("model",
-                    LegacyMap
-                        .of("shareInfos", getShareInfos(request), "user",
-                                userService.getCurrentUserStrict(request), "useRadio",
-                                settingsFacade.get(SKeys.general.legacy.useRadio), "shareCount",
-                                shareService.getAllShares().size()));
+        // spotless:off
+        model.addAttribute("model", LegacyMap.of(
+                "shareInfos", getShareInfos(request),
+                "user", userService.getCurrentUserStrict(request),
+                "useRadio", settingsFacade.get(SKeys.general.legacy.useRadio),
+                "useDatabaseSettings", settingsFacade.get(SKeys.general.legacy.useDatabaseSettings),
+                "shareCount", shareService.getAllShares().size()));
+        // spotless:on
         return "shareSettings";
     }
 

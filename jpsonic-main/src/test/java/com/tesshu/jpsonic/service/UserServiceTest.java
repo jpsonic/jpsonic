@@ -2,7 +2,7 @@ package com.tesshu.jpsonic.service;
 
 import static org.junit.Assert.assertNotNull;
 
-import com.tesshu.jpsonic.domain.provider.UserProvider;
+import com.tesshu.jpsonic.domain.provider.resource.UserProvider;
 import com.tesshu.jpsonic.persistence.NeedsDB;
 import com.tesshu.jpsonic.persistence.core.entity.User;
 import com.tesshu.jpsonic.persistence.core.entity.UserSettings;

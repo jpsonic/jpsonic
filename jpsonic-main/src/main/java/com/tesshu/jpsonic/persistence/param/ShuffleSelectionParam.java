@@ -25,7 +25,6 @@ import java.time.Instant;
 import java.util.List;
 
 import com.tesshu.jpsonic.persistence.api.entity.MusicFolder;
-import com.tesshu.jpsonic.service.SearchService;
 
 /**
  * Defines criteria used when generating random playlists.

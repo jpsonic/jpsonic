@@ -104,6 +104,9 @@
 
         <!-- allowCommentedBlocks will be ignored. (And duplicate with Checkstyle) -->
         <exclude name="EmptyControlStatement" />
+
+        <!-- This rule conflicts with modern Java coding style. -->
+        <exclude name="LocalVariableDeclarationShouldBeAtStartOfBlock" />
     </rule>
 
     <!-- Java Rules:Design -->

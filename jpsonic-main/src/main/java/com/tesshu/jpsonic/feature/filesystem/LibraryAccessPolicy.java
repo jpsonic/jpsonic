@@ -23,6 +23,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
+import com.tesshu.jpsonic.domain.provider.resource.MediaFileProvider;
 import com.tesshu.jpsonic.infrastructure.filesystem.PathInspector;
 import com.tesshu.jpsonic.infrastructure.settings.SKeys;
 import com.tesshu.jpsonic.infrastructure.settings.SettingsFacade;
@@ -51,12 +52,14 @@ public class LibraryAccessPolicy {
     private final SettingsFacade settingsFacade;
     private final PathInspector pathInspector;
     private final MusicFolderService musicFolderService;
+    private final MediaFileProvider mediaFileProvider;
 
     public LibraryAccessPolicy(SettingsFacade settingsFacade, PathInspector pathInspector,
-            MusicFolderService musicFolderService) {
+            MusicFolderService musicFolderService, MediaFileProvider mediaFileProvider) {
         this.settingsFacade = settingsFacade;
         this.pathInspector = pathInspector;
         this.musicFolderService = musicFolderService;
+        this.mediaFileProvider = mediaFileProvider;
     }
 
     /**
@@ -177,15 +180,7 @@ public class LibraryAccessPolicy {
 
     public boolean canAccessMediaFile(String username,
             com.tesshu.jpsonic.domain.model.MediaFile mediaFile) {
-        if (isInPodcastFolder(mediaFile.toPath())) {
-            return true;
-        }
-
-        for (MusicFolder musicFolder : musicFolderService.getMusicFoldersForUser(username)) {
-            if (musicFolder.getId() == mediaFile.folderId()) {
-                return true;
-            }
-        }
-        return false;
+        return isInPodcastFolder(mediaFile.toPath())
+                || mediaFileProvider.existsAccessibleMediaFile(username, mediaFile);
     }
 }

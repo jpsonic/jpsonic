@@ -115,6 +115,7 @@ $(document).ready(function () {
     <c:param name="cat" value="database"/>
     <c:param name="toast" value="${settings_toast}"/>
     <c:param name="useRadio" value="${command.useRadio}"/>
+    <c:param name="useDatabaseSettings" value="${command.useDatabaseSettings}"/>
     <c:param name="existsShare" value="${command.shareCount ne 0}"/>
 </c:import>
 

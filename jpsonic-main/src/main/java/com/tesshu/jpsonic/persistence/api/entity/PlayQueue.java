@@ -32,8 +32,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import com.tesshu.jpsonic.SuppressFBWarnings;
 import com.tesshu.jpsonic.ThreadSafe;
+import com.tesshu.jpsonic.infrastructure.concurrent.ReadWriteLockSupport;
 import com.tesshu.jpsonic.persistence.param.ShuffleSelectionParam;
-import com.tesshu.jpsonic.util.concurrent.ReadWriteLockSupport;
 
 /**
  * A play queue is a list of music files that are associated to a remote player.

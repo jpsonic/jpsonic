@@ -28,13 +28,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import com.tesshu.jpsonic.domain.provider.state.ScannerStateProvider;
 import com.tesshu.jpsonic.domain.system.CoverArtScheme;
+import com.tesshu.jpsonic.infrastructure.collection.util.LegacyMap;
 import com.tesshu.jpsonic.persistence.api.entity.PodcastChannel;
 import com.tesshu.jpsonic.persistence.core.entity.User;
 import com.tesshu.jpsonic.service.PodcastService;
-import com.tesshu.jpsonic.service.ScannerStateService;
 import com.tesshu.jpsonic.service.UserService;
-import com.tesshu.jpsonic.util.LegacyMap;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Controller;
@@ -53,15 +53,15 @@ public class PodcastChannelsController {
 
     private final UserService userService;
     private final PodcastService podcastService;
-    private final ScannerStateService scannerStateService;
+    private final ScannerStateProvider scannerStateProvider;
     private final ViewAsListSelector viewSelector;
 
     public PodcastChannelsController(UserService userService, PodcastService podcastService,
-            ScannerStateService scannerStateService, ViewAsListSelector viewSelector) {
+            ScannerStateProvider scannerStateProvider, ViewAsListSelector viewSelector) {
         super();
         this.userService = userService;
         this.podcastService = podcastService;
-        this.scannerStateService = scannerStateService;
+        this.scannerStateProvider = scannerStateProvider;
         this.viewSelector = viewSelector;
     }
 
@@ -90,7 +90,7 @@ public class PodcastChannelsController {
                         .collect(Collectors.toList()),
                     "viewAsList", viewSelector.isViewAsList(request, user.getUsername()),
                     "coverArtSize", CoverArtScheme.MEDIUM.getSize(), "scanning",
-                    scannerStateService.isScanning());
+                    scannerStateProvider.isScanning());
 
         ModelAndView result = new ModelAndView();
         result.addObject("model", map);

@@ -25,6 +25,8 @@ import static org.mockito.Mockito.when;
 
 import java.util.Locale;
 
+import com.tesshu.jpsonic.domain.provider.resource.ServerLocaleProvider;
+import com.tesshu.jpsonic.infrastructure.locale.ServerLocaleManager;
 import com.tesshu.jpsonic.infrastructure.settings.SettingsFacade;
 import com.tesshu.jpsonic.infrastructure.settings.SettingsFacadeBuilder;
 import com.tesshu.jpsonic.persistence.core.entity.UserSettings;
@@ -43,8 +45,8 @@ class AirsonicLocaleResolverTest {
     void setUp() {
         userService = mock(UserService.class);
         SettingsFacade settingsFacade = SettingsFacadeBuilder.create().buildWithDefault();
-        ServerLocaleService serverLocaleService = new ServerLocaleService(settingsFacade);
-        resolver = new AirsonicLocaleResolver(userService, serverLocaleService);
+        ServerLocaleProvider serverLocaleProvider = new ServerLocaleManager(settingsFacade);
+        resolver = new AirsonicLocaleResolver(userService, serverLocaleProvider);
     }
 
     @Test

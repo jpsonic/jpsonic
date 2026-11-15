@@ -21,9 +21,9 @@
 
 package com.tesshu.jpsonic.controller;
 
+import com.tesshu.jpsonic.infrastructure.scanner.WritableMediaFileService;
 import com.tesshu.jpsonic.persistence.api.entity.MediaFile;
 import com.tesshu.jpsonic.service.MediaFileService;
-import com.tesshu.jpsonic.service.scanner.WritableMediaFileService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.apache.commons.text.StringEscapeUtils;
 import org.springframework.stereotype.Controller;

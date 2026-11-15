@@ -65,7 +65,6 @@ class AlbumDaoStarredPersistenceTest extends AbstractNeedsScan {
     void testStarredPersistence() throws IOException, InterruptedException {
 
         // Checking registered data
-        assertEquals(4, albumDao.getAlbumCount(folders));
         List<Album> albums = albumDao
             .getAlphabeticalAlbums(0, Integer.MAX_VALUE, false, true, folders);
         assertEquals(4, albums.size());

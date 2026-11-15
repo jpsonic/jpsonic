@@ -39,7 +39,7 @@ public class HsqlDBAlbumDao implements DialectAlbumDao {
     }
 
     @Override
-    public List<Album> getAlbumsByGenre(int offset, int count, List<String> genres,
+    public List<Album> getAlbumsByGenre(long offset, long count, List<String> genres,
             List<MusicFolder> folders) {
         return deligate.getAlbumsByGenre(offset, count, genres, folders);
     }

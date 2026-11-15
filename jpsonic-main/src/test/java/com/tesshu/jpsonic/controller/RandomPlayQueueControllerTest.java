@@ -22,20 +22,10 @@ package com.tesshu.jpsonic.controller;
 import static com.tesshu.jpsonic.service.ServiceMockUtils.mock;
 import static org.junit.Assert.assertNull;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.nullable;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
@@ -46,9 +36,7 @@ import com.tesshu.jpsonic.service.MusicFolderService;
 import com.tesshu.jpsonic.service.PlayerService;
 import com.tesshu.jpsonic.service.ServiceMockUtils;
 import com.tesshu.jpsonic.service.UserService;
-import com.tesshu.jpsonic.service.search.IndexManager;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
@@ -61,8 +49,6 @@ import org.springframework.web.servlet.ModelAndView;
 @SuppressWarnings({ "PMD.AvoidDuplicateLiterals", "PMD.TooManyStaticImports" })
 class RandomPlayQueueControllerTest {
 
-    private IndexManager indexManager;
-
     private RandomPlayQueueController controller;
     private MockMvc mockMvc;
 
@@ -73,11 +59,8 @@ class RandomPlayQueueControllerTest {
         player.setUsername(ServiceMockUtils.ADMIN_NAME);
         player.setPlayQueue(new PlayQueue());
         when(playerService.getPlayer(any(), any())).thenReturn(player);
-        indexManager = mock(IndexManager.class);
-        when(indexManager.toPreAnalyzedGenres(anyList(), nullable(Boolean.class)))
-            .thenReturn(Collections.emptyList());
         controller = new RandomPlayQueueController(mock(MusicFolderService.class),
-                mock(UserService.class), playerService, mock(MediaFileService.class), indexManager);
+                mock(UserService.class), playerService, mock(MediaFileService.class));
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
 
@@ -140,29 +123,5 @@ class RandomPlayQueueControllerTest {
         assertNotNull(controller.getLastPlayed("1year", "lt").getMaxLastPlayedDate());
         assertNotNull(controller.getLastPlayed("1year", "gt").getMinLastPlayedDate());
         assertNull(controller.getLastPlayed("1year", "gt").getMaxLastPlayedDate());
-    }
-
-    @Nested
-    class ParseGenreTest {
-
-        @Test
-        void testNullArgReturnsEmptyList() {
-            assertTrue(controller.parseGenre(null).isEmpty());
-            verify(indexManager, never()).toPreAnalyzedGenres(anyList(), anyBoolean());
-        }
-
-        @Test
-        void testEmptyArgReturnsEmptyList() {
-            assertTrue(controller.parseGenre("").isEmpty());
-            verify(indexManager, never()).toPreAnalyzedGenres(anyList(), anyBoolean());
-        }
-
-        @Test
-        void testNotEmptyArgReturnsList() {
-            when(indexManager.toPreAnalyzedGenres(anyList(), nullable(Boolean.class)))
-                .thenReturn(Arrays.asList("genre"));
-            assertFalse(controller.parseGenre("genre").isEmpty());
-            verify(indexManager, times(1)).toPreAnalyzedGenres(anyList(), anyBoolean());
-        }
     }
 }

@@ -26,17 +26,17 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import com.tesshu.jpsonic.domain.provider.state.ScannerStateProvider;
 import com.tesshu.jpsonic.feature.filesystem.LibraryAccessPolicy;
+import com.tesshu.jpsonic.infrastructure.collection.util.LegacyMap;
 import com.tesshu.jpsonic.infrastructure.filesystem.PathInspector;
 import com.tesshu.jpsonic.persistence.api.entity.MediaFile;
 import com.tesshu.jpsonic.persistence.core.entity.UserSettings;
 import com.tesshu.jpsonic.service.MediaFileService;
-import com.tesshu.jpsonic.service.ScannerStateService;
 import com.tesshu.jpsonic.service.UserService;
 import com.tesshu.jpsonic.service.metadata.MetaDataParser;
 import com.tesshu.jpsonic.service.metadata.MetaDataParserFactory;
 import com.tesshu.jpsonic.service.metadata.ParserUtils;
-import com.tesshu.jpsonic.util.LegacyMap;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.ServletRequestBindingException;
@@ -58,17 +58,17 @@ public class EditTagsController {
     private final UserService userService;
     private final MetaDataParserFactory metaDataParserFactory;
     private final MediaFileService mediaFileService;
-    private final ScannerStateService scannerStateService;
+    private final ScannerStateProvider scannerStateProvider;
 
     public EditTagsController(LibraryAccessPolicy libraryAccessPolicy, UserService userService,
             MetaDataParserFactory metaDataParserFactory, MediaFileService mediaFileService,
-            ScannerStateService scannerStateService) {
+            ScannerStateProvider scannerStateProvider) {
         super();
         this.libraryAccessPolicy = libraryAccessPolicy;
         this.userService = userService;
         this.metaDataParserFactory = metaDataParserFactory;
         this.mediaFileService = mediaFileService;
-        this.scannerStateService = scannerStateService;
+        this.scannerStateProvider = scannerStateProvider;
     }
 
     @GetMapping
@@ -88,7 +88,7 @@ public class EditTagsController {
             map.put("defaultGenre", files.get(0).getGenre());
         }
         map.put("allGenres", ParserUtils.getID3V1Genres());
-        map.put("scanning", scannerStateService.isScanning());
+        map.put("scanning", scannerStateProvider.isScanning());
 
         List<ParsedSong> parsedSongs = new ArrayList<>();
         for (int i = 0; i < files.size(); i++) {

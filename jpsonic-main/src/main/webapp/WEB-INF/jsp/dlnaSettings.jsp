@@ -22,11 +22,11 @@
 <%@ include file="head.jsp" %>
 <%@ include file="jquery.jsp" %>
 <%@ page import="com.tesshu.jpsonic.domain.model.TranscodingDefinition.BitRateLimit" %>
+<%@ page import="com.tesshu.jpsonic.domain.system.MenuItemId" %>
+<%@ page import="com.tesshu.jpsonic.infrastructure.search.UPnPSearchMethod" %>
 <%@ page import="com.tesshu.jpsonic.feature.crypt.upnp.KeyRotationType" %>
 <%@ page import="com.tesshu.jpsonic.feature.crypt.upnp.KeyRotationPeriod" %>
-<%@ page import="com.tesshu.jpsonic.domain.system.MenuItemId" %>
-<%@ page import="com.tesshu.jpsonic.service.MenuItemService.ResetMode" %>
-<%@ page import="com.tesshu.jpsonic.feature.search.UPnPSearchMethod" %>
+<%@ page import="com.tesshu.jpsonic.infrastructure.menu.MenuItemManager.ResetMode" %>
 
 <script src="<c:url value='/script/utils.js'/>"></script>
 <script>
@@ -89,6 +89,7 @@
     <c:param name="cat" value="dlna"/>
     <c:param name="toast" value='${settings_toast}'/>
     <c:param name="useRadio" value="${command.useRadio}"/>
+    <c:param name="useDatabaseSettings" value="${command.useDatabaseSettings}"/>
     <c:param name="existsShare" value="${command.shareCount ne 0}"/>
 </c:import>
 

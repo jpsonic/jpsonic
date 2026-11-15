@@ -25,6 +25,11 @@ import java.io.IOException;
 import java.util.List;
 
 import com.tesshu.jpsonic.controller.form.SearchCommand;
+import com.tesshu.jpsonic.infrastructure.scanner.HttpSearchCriteriaDirector;
+import com.tesshu.jpsonic.infrastructure.scanner.IndexType;
+import com.tesshu.jpsonic.infrastructure.search.LegacySearch;
+import com.tesshu.jpsonic.infrastructure.search.LegacySearchResult;
+import com.tesshu.jpsonic.infrastructure.search.criteria.HttpSearchCriteria;
 import com.tesshu.jpsonic.infrastructure.settings.SKeys;
 import com.tesshu.jpsonic.infrastructure.settings.SettingsFacade;
 import com.tesshu.jpsonic.persistence.api.entity.MusicFolder;
@@ -32,12 +37,7 @@ import com.tesshu.jpsonic.persistence.core.entity.User;
 import com.tesshu.jpsonic.persistence.core.entity.UserSettings;
 import com.tesshu.jpsonic.service.MusicFolderService;
 import com.tesshu.jpsonic.service.PlayerService;
-import com.tesshu.jpsonic.service.SearchService;
 import com.tesshu.jpsonic.service.UserService;
-import com.tesshu.jpsonic.service.search.HttpSearchCriteria;
-import com.tesshu.jpsonic.service.search.HttpSearchCriteriaDirector;
-import com.tesshu.jpsonic.service.search.IndexType;
-import com.tesshu.jpsonic.service.search.SearchResult;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.apache.commons.lang3.StringUtils;
@@ -64,18 +64,18 @@ public class SearchController {
     private final MusicFolderService musicFolderService;
     private final UserService userService;
     private final PlayerService playerService;
-    private final SearchService searchService;
+    private final LegacySearch legacySearch;
     private final HttpSearchCriteriaDirector director;
 
     public SearchController(SettingsFacade settingsFacade, MusicFolderService musicFolderService,
-            UserService userService, PlayerService playerService, SearchService searchService,
+            UserService userService, PlayerService playerService, LegacySearch legacySearch,
             HttpSearchCriteriaDirector director) {
         super();
         this.settingsFacade = settingsFacade;
         this.musicFolderService = musicFolderService;
         this.userService = userService;
         this.playerService = playerService;
-        this.searchService = searchService;
+        this.legacySearch = legacySearch;
         this.director = director;
     }
 
@@ -115,17 +115,17 @@ public class SearchController {
 
             HttpSearchCriteria criteria = director
                 .construct(query, offset, count, includeComposer, musicFolders, IndexType.ARTIST);
-            SearchResult artists = searchService.search(criteria);
+            LegacySearchResult artists = legacySearch.search(criteria);
             command.setArtists(artists.getMediaFiles());
 
             criteria = director
                 .construct(query, offset, count, includeComposer, musicFolders, IndexType.ALBUM);
-            SearchResult albums = searchService.search(criteria);
+            LegacySearchResult albums = legacySearch.search(criteria);
             command.setAlbums(albums.getMediaFiles());
 
             criteria = director
                 .construct(query, offset, count, includeComposer, musicFolders, IndexType.SONG);
-            SearchResult songs = searchService.search(criteria);
+            LegacySearchResult songs = legacySearch.search(criteria);
             command.setSongs(songs.getMediaFiles());
 
             command.setPlayer(playerService.getPlayer(request, response));

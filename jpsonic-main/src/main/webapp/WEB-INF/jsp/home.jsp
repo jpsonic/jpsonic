@@ -192,7 +192,7 @@ $(document).ready(function(){
                     <sub:url value="main.view" var="mainUrl">
                         <sub:param name="id" value="${artist.id}"/>
                     </sub:url>
-                    <li><a target="main" href="${mainUrl}" title="${artist.artistReading}">${fn:escapeXml(artist.name)}</a></li>
+                    <li><a target="main" href="${mainUrl}" title="${artist.reading}">${fn:escapeXml(artist.name)}</a></li>
                 </c:forEach>
             </ul>
         </details>
@@ -211,7 +211,7 @@ $(document).ready(function(){
                         <c:param name="playEnabled" value="${model.user.streamRole and not model.partyMode}"/>
                         <c:param name="addEnabled" value="${model.user.streamRole and not model.partyMode}"/>
                         <c:param name="downloadEnabled" value="${model.user.downloadRole and model.showDownload}"/>
-                        <c:param name="video" value="${song.video}"/>
+                        <c:param name="video" value="${song.isVideo}"/>
                     </c:import>
                 </li>
             </c:forEach>

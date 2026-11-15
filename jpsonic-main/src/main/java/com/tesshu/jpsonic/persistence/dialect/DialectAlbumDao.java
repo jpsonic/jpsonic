@@ -27,6 +27,6 @@ import com.tesshu.jpsonic.persistence.api.entity.MusicFolder;
 @FunctionalInterface
 public interface DialectAlbumDao {
 
-    List<Album> getAlbumsByGenre(int offset, int count, List<String> genres,
+    List<Album> getAlbumsByGenre(long offset, long count, List<String> genres,
             List<MusicFolder> folders);
 }

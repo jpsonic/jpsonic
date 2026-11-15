@@ -30,6 +30,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
@@ -46,7 +47,7 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * @author Sindre Mehus
  */
-@SuppressWarnings("PMD.AvoidDuplicateLiterals") // Only DAO is allowed to exclude this rule #827
+@SuppressWarnings({ "PMD.AvoidDuplicateLiterals", "PMD.FieldDeclarationsShouldBeAtStartOfClass" })
 @Repository
 public class PlaylistDao {
 
@@ -206,5 +207,77 @@ public class PlaylistDao {
                     nullableInstantOf(rs.getTimestamp(8)), nullableInstantOf(rs.getTimestamp(9)),
                     rs.getString(10));
         }
+    }
+
+    // ############################################################################
+    // Jpsonic domain
+
+    private static final String DOMAIN_COLUMNS_QUERY = "id, name, comment, file_count\s";
+    private static final String DOMAIN_TABLES_QUERY = "from playlist\s";
+    private final RowMapper<com.tesshu.jpsonic.domain.model.Playlist> domainRowMapper = (
+            ResultSet rs, int rowNum) -> new com.tesshu.jpsonic.domain.model.Playlist(rs.getInt(1), // id
+                    rs.getString(2), // name
+                    rs.getString(3), // comment,
+                    rs.getInt(4)); // fileCount
+
+    public int countPlaylists() {
+        return template.queryForInt("""
+                select count(id)
+                from playlist
+                """, 0);
+    }
+
+    public int countPublishedPlaylists() {
+        return template.queryForInt("""
+                select count(id)
+                from playlist where is_public
+                """, 0);
+    }
+
+    public com.tesshu.jpsonic.domain.model.Playlist getDomainPlaylist(int id) {
+        return template
+            .queryOne("select " + DOMAIN_COLUMNS_QUERY + DOMAIN_TABLES_QUERY + "where id=?",
+                    domainRowMapper, id);
+    }
+
+    public List<com.tesshu.jpsonic.domain.model.Playlist> findPlaylists(long offset, long count) {
+        Map<String, Object> args = Map.of("offset", offset, "count", count);
+        String query = "select " + DOMAIN_COLUMNS_QUERY + DOMAIN_TABLES_QUERY
+                + "offset :offset limit :count";
+        return template.namedQuery(query, domainRowMapper, args);
+    }
+
+    public List<com.tesshu.jpsonic.domain.model.Playlist> findPublishedPlaylists(long offset,
+            long count) {
+        Map<String, Object> args = Map.of("offset", offset, "count", count);
+        String query = "select " + DOMAIN_COLUMNS_QUERY + DOMAIN_TABLES_QUERY + """
+                    where is_public
+                    offset :offset limit :count
+                """;
+        return template.namedQuery(query, domainRowMapper, args);
+    }
+
+    @Transactional
+    public void setDomainFilesInPlaylist(int id,
+            List<com.tesshu.jpsonic.domain.model.MediaFile> files) {
+        template.update("""
+                delete from playlist_file
+                where playlist_id=?
+                """, id);
+        int duration = 0;
+        for (com.tesshu.jpsonic.domain.model.MediaFile file : files) {
+            template.update("""
+                    insert into playlist_file (playlist_id, media_file_id)
+                    values (?, ?)
+                    """, id, file.id());
+            if (file.durationSeconds().isPresent()) {
+                duration += file.durationSeconds().value();
+            }
+        }
+        template.update("""
+                update playlist
+                set file_count=?, duration_seconds=?, changed=?
+                where id=?
+                """, files.size(), duration, now(), id);
     }
 }

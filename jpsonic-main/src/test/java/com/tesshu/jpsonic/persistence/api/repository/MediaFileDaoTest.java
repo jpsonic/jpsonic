@@ -26,7 +26,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -41,7 +40,6 @@ import com.tesshu.jpsonic.persistence.api.entity.MediaFile;
 import com.tesshu.jpsonic.persistence.api.entity.MediaFile.MediaType;
 import com.tesshu.jpsonic.persistence.api.entity.MusicFolder;
 import com.tesshu.jpsonic.persistence.api.repository.MediaFileDao.ChildOrder;
-import com.tesshu.jpsonic.persistence.api.repository.MediaFileDao.IndexWithCount;
 import com.tesshu.jpsonic.persistence.api.repository.MediaFileDao.RandomSongsQueryBuilder;
 import com.tesshu.jpsonic.persistence.base.DaoHelper;
 import com.tesshu.jpsonic.persistence.base.TemplateWrapper;
@@ -82,6 +80,8 @@ class MediaFileDaoTest {
         void updateArtistSortTest() {
             ArtistSortCandidate artist = new ArtistSortCandidate("artist", "artistSort", 1,
                     "DIRECTORY", TargetField.ARTIST.getValue());
+            artist.setMusicIndex("A");
+
             List<ArtistSortCandidate> cands = List.of(artist);
             ArgumentCaptor<String> queryCaptor = ArgumentCaptor.forClass(String.class);
             ArgumentCaptor<Object[]> argCaptor = ArgumentCaptor.forClass(Object[].class);
@@ -761,12 +761,6 @@ class MediaFileDaoTest {
         }
 
         @Test
-        void testGetSizeOf() {
-            assertEquals(5, mediaFileDao.getSizeOf(getMusicFolders(), MediaType.MUSIC));
-            assertEquals(1, mediaFileDao.getSizeOf(getMusicFolders(), MediaType.VIDEO));
-        }
-
-        @Test
         void testGetChildSizeOfMusicFolder() {
             assertEquals(5, mediaFileDao.getChildSizeOf(getMusicFolders()), "No filter");
             assertEquals(4, mediaFileDao.getChildSizeOf(getMusicFolders(), MediaType.MUSIC),
@@ -781,62 +775,6 @@ class MediaFileDaoTest {
                     mediaFileDao
                         .getChildSizeOf(getMusicFolders(), MediaType.MUSIC, MediaType.VIDEO),
                     "Other than Music and Video");
-        }
-
-        @Test
-        void testGetChildSizeOfPath() {
-            String folderPath = MUSIC_FOLDER.getPathString();
-            assertEquals(5, mediaFileDao.getChildSizeOf(folderPath), "No filter");
-            assertEquals(4, mediaFileDao.getChildSizeOf(folderPath, MediaType.MUSIC),
-                    "Other than Music");
-            assertEquals(4, mediaFileDao.getChildSizeOf(folderPath, MediaType.VIDEO),
-                    "Other than Video");
-            assertEquals(4, mediaFileDao.getChildSizeOf(folderPath, MediaType.ALBUM),
-                    "Other than Album");
-            assertEquals(3, mediaFileDao.getChildSizeOf(folderPath, MediaType.DIRECTORY),
-                    "Other than Dir");
-            assertEquals(3,
-                    mediaFileDao.getChildSizeOf(folderPath, MediaType.MUSIC, MediaType.VIDEO),
-                    "Other than Music and Video");
-
-            assertEquals(0, mediaFileDao.getChildSizeOf(Path.of(folderPath, "Dir1").toString()));
-
-            assertEquals(1, mediaFileDao.getChildSizeOf(Path.of(folderPath, "Dir4").toString()));
-            assertEquals(1,
-                    mediaFileDao.getChildSizeOf(Path.of(folderPath, "Dir4", "Dir5").toString()));
-            assertEquals(1, mediaFileDao
-                .getChildSizeOf(Path.of(folderPath, "Dir4", "Dir5", "Album3").toString()));
-            assertEquals(0,
-                    mediaFileDao
-                        .getChildSizeOf(Path.of(folderPath, "Dir4", "Dir5", "Album3").toString(),
-                                MediaType.MUSIC));
-
-            assertEquals(3, mediaFileDao.getChildSizeOf(Path.of(folderPath, "Album1").toString()));
-            assertEquals(0,
-                    mediaFileDao.getChildSizeOf(Path.of(folderPath, "Album1", "Dir2").toString()));
-            assertEquals(2,
-                    mediaFileDao.getChildSizeOf(Path.of(folderPath, "Album1", "Dir3").toString()));
-            assertEquals(1, mediaFileDao
-                .getChildSizeOf(Path.of(folderPath, "Album1", "Dir3", "Album2").toString()));
-            assertEquals(0,
-                    mediaFileDao
-                        .getChildSizeOf(Path.of(folderPath, "Album1", "Dir3", "Album2").toString(),
-                                MediaType.MUSIC));
-        }
-
-        @Test
-        void testGetMudicIndexCounts() {
-            List<MusicFolder> folders = List.of(MUSIC_FOLDER);
-            List<IndexWithCount> counts = mediaFileDao
-                .getMudicIndexCounts(folders, Collections.emptyList());
-            assertEquals(2, counts.size());
-            counts.stream().forEach(index -> {
-                switch (index.index()) {
-                case "D" -> assertEquals(2, index.directoryCount()); // It's ~Folder/Dir**
-                case "A" -> assertEquals(1, index.directoryCount()); // It's ~Folder/Album**
-                default -> throw new IllegalArgumentException("Unexpected value: " + index.index());
-                }
-            });
         }
 
         /**

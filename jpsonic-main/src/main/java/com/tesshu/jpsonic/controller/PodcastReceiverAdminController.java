@@ -23,10 +23,10 @@ package com.tesshu.jpsonic.controller;
 
 import static org.apache.commons.lang3.ObjectUtils.isEmpty;
 
+import com.tesshu.jpsonic.domain.provider.state.ScannerStateProvider;
 import com.tesshu.jpsonic.domain.system.PodcastStatus;
 import com.tesshu.jpsonic.persistence.api.entity.PodcastEpisode;
 import com.tesshu.jpsonic.service.PodcastService;
-import com.tesshu.jpsonic.service.ScannerStateService;
 import com.tesshu.jpsonic.util.StringUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import org.apache.commons.lang3.StringUtils;
@@ -49,19 +49,19 @@ import org.springframework.web.servlet.view.RedirectView;
 public class PodcastReceiverAdminController {
 
     private final PodcastService podcastService;
-    private final ScannerStateService scannerStateService;
+    private final ScannerStateProvider scannerStateProvider;
 
     public PodcastReceiverAdminController(PodcastService podcastService,
-            ScannerStateService scannerStateService) {
+            ScannerStateProvider scannerStateProvider) {
         super();
         this.podcastService = podcastService;
-        this.scannerStateService = scannerStateService;
+        this.scannerStateProvider = scannerStateProvider;
     }
 
     @GetMapping
     protected ModelAndView get(HttpServletRequest request) throws ServletRequestBindingException {
 
-        if (scannerStateService.isScanning()) {
+        if (scannerStateProvider.isScanning()) {
             return createModelAndView();
         }
 

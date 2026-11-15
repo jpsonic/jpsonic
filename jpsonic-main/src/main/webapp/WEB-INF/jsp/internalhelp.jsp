@@ -269,7 +269,6 @@
     </dl>
 </details>
 
-
 <details open>
     <summary class="statusOK">
         <fmt:message key="internalhelp.statistics"/>
@@ -308,38 +307,6 @@
         </table>
     </c:if>
 </details>
-
-<c:if test="${model.showIndexDetails}">
-    <details>
-        <summary class="statusOK">
-            <fmt:message key="internalhelp.indexdetails"/>
-        </summary>
-        <dl>
-            <c:forEach var="stat" items="${model.indexStatistics}">
-                    <dt><fmt:message key="internalhelp.indexdeletedcount"><fmt:param value="${stat.value.name}"/></fmt:message></dt>
-                    <dd>${stat.value.deletedCount}</dd>
-            </c:forEach>
-            <c:forEach var="stat" items="${model.indexStatistics}">
-                    <dt><fmt:message key="internalhelp.indexcount"><fmt:param value="${stat.value.name}"/></fmt:message></dt>
-                    <dd>${stat.value.count}</dd>
-            </c:forEach>
-        </dl>
-    </details>
-</c:if>
-
-<c:if test="${model.showDBDetails}">
-    <details>
-        <summary class="statusOK">
-            <fmt:message key="internalhelp.databasedetails"/>
-        </summary>
-        <dl>
-            <c:forEach var="tableCount" items="${model.dbTableCount}">
-                <dt><fmt:message key="internalhelp.tablecount"><fmt:param value="${tableCount.key}"/></fmt:message></dt>
-                <dd>${tableCount.value}</dd>
-            </c:forEach>
-        </dl>
-    </details>
-</c:if>
 
 <div class="submits">
     <input type="button" onClick="location.href='internalhelp.view?'" value="<fmt:message key='common.refresh'/>" />

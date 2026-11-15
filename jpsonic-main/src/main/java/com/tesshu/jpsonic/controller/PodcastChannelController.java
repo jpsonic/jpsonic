@@ -25,11 +25,11 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.stream.Collectors;
 
+import com.tesshu.jpsonic.domain.provider.state.ScannerStateProvider;
 import com.tesshu.jpsonic.domain.system.CoverArtScheme;
+import com.tesshu.jpsonic.infrastructure.collection.util.LegacyMap;
 import com.tesshu.jpsonic.service.PodcastService;
-import com.tesshu.jpsonic.service.ScannerStateService;
 import com.tesshu.jpsonic.service.UserService;
-import com.tesshu.jpsonic.util.LegacyMap;
 import jakarta.servlet.http.HttpServletRequest;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.springframework.stereotype.Controller;
@@ -49,14 +49,14 @@ import org.springframework.web.servlet.ModelAndView;
 public class PodcastChannelController {
 
     private final UserService userService;
-    private final ScannerStateService scannerStateService;
+    private final ScannerStateProvider scannerStateProvider;
     private final PodcastService podcastService;
 
     public PodcastChannelController(UserService userService,
-            ScannerStateService scannerStateService, PodcastService podcastService) {
+            ScannerStateProvider scannerStateProvider, PodcastService podcastService) {
         super();
         this.userService = userService;
-        this.scannerStateService = scannerStateService;
+        this.scannerStateProvider = scannerStateProvider;
         this.podcastService = podcastService;
     }
 
@@ -78,7 +78,7 @@ public class PodcastChannelController {
                                     .map(PodcastEpisode::new)
                                     .collect(Collectors.toList()),
                                 "coverArtSize", CoverArtScheme.LARGE.getSize(), "scanning",
-                                scannerStateService.isScanning()));
+                                scannerStateProvider.isScanning()));
         return result;
     }
 

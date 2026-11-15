@@ -26,14 +26,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.util.Arrays;
 import java.util.Optional;
 
+import com.tesshu.jpsonic.domain.provider.state.ScannerStateProvider;
+import com.tesshu.jpsonic.infrastructure.scanner.MediaScannerServiceImpl;
 import com.tesshu.jpsonic.persistence.api.entity.MediaFile;
 import com.tesshu.jpsonic.persistence.api.entity.Player;
 import com.tesshu.jpsonic.service.MediaScannerService.ScanPhaseInfo;
-import com.tesshu.jpsonic.service.ScannerStateService;
 import com.tesshu.jpsonic.service.ServiceMockUtils;
 import com.tesshu.jpsonic.service.StatusService;
 import com.tesshu.jpsonic.service.StatusService.PlayStatus;
-import com.tesshu.jpsonic.service.scanner.MediaScannerServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -54,7 +54,8 @@ class ScanInfoServiceTest {
         PlayStatus playStatus = new PlayStatus(file, player, now());
         Mockito.when(statusService.getPlayStatuses()).thenReturn(Arrays.asList(playStatus));
         mediaScannerService = mock(MediaScannerServiceImpl.class);
-        scanInfoService = new ScanInfoService(mock(ScannerStateService.class), mediaScannerService);
+        scanInfoService = new ScanInfoService(mock(ScannerStateProvider.class),
+                mediaScannerService);
     }
 
     @WithMockUser(username = ServiceMockUtils.ADMIN_NAME)

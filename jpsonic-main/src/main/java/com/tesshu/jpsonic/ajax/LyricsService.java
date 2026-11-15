@@ -29,8 +29,8 @@ import java.net.SocketException;
 import java.net.URI;
 import java.util.concurrent.ExecutionException;
 
+import com.tesshu.jpsonic.domain.language.StringUtil;
 import com.tesshu.jpsonic.infrastructure.concurrent.ConcurrentUtils;
-import com.tesshu.jpsonic.util.StringUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.ConnectTimeoutException;
 import org.apache.hc.client5.http.classic.methods.HttpGet;

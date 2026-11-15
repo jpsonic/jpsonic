@@ -28,11 +28,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import com.tesshu.jpsonic.infrastructure.collection.util.LegacyMap;
 import com.tesshu.jpsonic.infrastructure.settings.SKeys;
 import com.tesshu.jpsonic.infrastructure.settings.SettingsFacade;
 import com.tesshu.jpsonic.persistence.api.entity.InternetRadio;
 import com.tesshu.jpsonic.service.InternetRadioService;
-import com.tesshu.jpsonic.util.LegacyMap;
 import jakarta.servlet.http.HttpServletRequest;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Controller;
@@ -71,6 +71,7 @@ public class InternetRadioSettingsController {
         Map<String, Object> map = LegacyMap.of();
         map.put("internetRadios", internetRadioService.getAllInternetRadios(true));
         map.put("useRadio", settingsFacade.get(SKeys.general.legacy.useRadio));
+        map.put("useDatabaseSetting", settingsFacade.get(SKeys.general.legacy.useDatabaseSettings));
         toast.ifPresent(b -> map.put("showToast", b));
         model.addAttribute("model", map);
         return "internetRadioSettings";

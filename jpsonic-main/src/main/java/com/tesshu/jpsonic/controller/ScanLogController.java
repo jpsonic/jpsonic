@@ -30,6 +30,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import com.tesshu.jpsonic.domain.provider.state.ScannerStateProvider;
+import com.tesshu.jpsonic.infrastructure.collection.util.LegacyMap;
 import com.tesshu.jpsonic.infrastructure.core.EnvironmentProvider;
 import com.tesshu.jpsonic.persistence.core.entity.ScanEvent;
 import com.tesshu.jpsonic.persistence.core.entity.ScanEvent.ScanEventType;
@@ -38,9 +40,7 @@ import com.tesshu.jpsonic.persistence.core.entity.ScanLog.ScanLogType;
 import com.tesshu.jpsonic.persistence.core.entity.User;
 import com.tesshu.jpsonic.persistence.core.entity.UserSettings;
 import com.tesshu.jpsonic.persistence.core.repository.StaticsDao;
-import com.tesshu.jpsonic.service.ScannerStateService;
 import com.tesshu.jpsonic.service.UserService;
-import com.tesshu.jpsonic.util.LegacyMap;
 import com.tesshu.jpsonic.util.StringUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import org.checkerframework.checker.nullness.qual.NonNull;
@@ -59,15 +59,15 @@ public class ScanLogController {
         .ofPattern("yyyy-MM-dd HH:mm:ss[.SSS]");
 
     private final UserService userService;
-    private final ScannerStateService scannerStateService;
+    private final ScannerStateProvider scannerStateProvider;
     private final StaticsDao staticsDao;
     private final OutlineHelpSelector outlineHelpSelector;
 
-    public ScanLogController(UserService userService, ScannerStateService scannerStateService,
+    public ScanLogController(UserService userService, ScannerStateProvider scannerStateProvider,
             StaticsDao staticsDao, OutlineHelpSelector outlineHelpSelector) {
         super();
         this.userService = userService;
-        this.scannerStateService = scannerStateService;
+        this.scannerStateProvider = scannerStateProvider;
         this.staticsDao = staticsDao;
         this.outlineHelpSelector = outlineHelpSelector;
     }
@@ -84,7 +84,7 @@ public class ScanLogController {
             .put("admin",
                     userService.isAdmin(userService.getCurrentUserStrict(request).getUsername()));
 
-        model.put("scanning", scannerStateService.isScanning());
+        model.put("scanning", scannerStateProvider.isScanning());
 
         List<ScanLogVO> scanLogs = staticsDao
             .getScanLog(ScanLogType.SCAN_ALL)
@@ -162,7 +162,7 @@ public class ScanLogController {
             scanLog.setStatus(lastEventType.name());
             break;
         default:
-            if (lastStartDate.equals(scanLog.getStartDate()) && scannerStateService.isScanning()) {
+            if (lastStartDate.equals(scanLog.getStartDate()) && scannerStateProvider.isScanning()) {
                 scanLog.setStatus("SCANNING");
             } else {
                 scanLog.setStatus(ScanEventType.UNKNOWN.name());

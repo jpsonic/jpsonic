@@ -31,11 +31,11 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import com.tesshu.jpsonic.controller.form.PersonalSettingsCommand;
+import com.tesshu.jpsonic.domain.provider.resource.ServerLocaleProvider;
 import com.tesshu.jpsonic.domain.system.AlbumListType;
 import com.tesshu.jpsonic.domain.system.AvatarScheme;
 import com.tesshu.jpsonic.domain.system.SpeechToTextLangScheme;
 import com.tesshu.jpsonic.domain.system.SupportableBCP47;
-import com.tesshu.jpsonic.feature.i18n.ServerLocaleService;
 import com.tesshu.jpsonic.feature.theme.ServerThemeService;
 import com.tesshu.jpsonic.feature.theme.Theme;
 import com.tesshu.jpsonic.infrastructure.settings.SKeys;
@@ -69,20 +69,20 @@ public class PersonalSettingsController {
 
     private final SettingsFacade settingsFacade;
     private final UserService userService;
-    private final ServerLocaleService serverLocaleService;
+    private final ServerLocaleProvider serverLocaleProvider;
     private final ServerThemeService serverThemeService;
     private final ShareService shareService;
     private final AvatarService avatarService;
     private final OutlineHelpSelector outlineHelpSelector;
 
     public PersonalSettingsController(SettingsFacade settingsFacade, UserService userService,
-            ServerLocaleService serverLocaleService, ServerThemeService serverThemeService,
+            ServerLocaleProvider serverLocaleProvider, ServerThemeService serverThemeService,
             ShareService shareService, AvatarService avatarService,
             OutlineHelpSelector outlineHelpSelector) {
         super();
         this.settingsFacade = settingsFacade;
         this.userService = userService;
-        this.serverLocaleService = serverLocaleService;
+        this.serverLocaleProvider = serverLocaleProvider;
         this.serverThemeService = serverThemeService;
         this.shareService = shareService;
         this.avatarService = avatarService;
@@ -101,16 +101,16 @@ public class PersonalSettingsController {
 
         // - Default language
         command.setLocaleIndex("-1");
-        serverLocaleService
+        serverLocaleProvider
             .getAvailableLocales()
             .stream()
-            .filter(locale -> locale.equals(serverLocaleService.getLocale()))
+            .filter(locale -> locale.equals(serverLocaleProvider.getLocale()))
             .findFirst()
             .ifPresent(locale -> command
-                .setLocaleIndex(
-                        String.valueOf(serverLocaleService.getAvailableLocales().indexOf(locale))));
+                .setLocaleIndex(String
+                    .valueOf(serverLocaleProvider.getAvailableLocales().indexOf(locale))));
         command
-            .setLocales(serverLocaleService
+            .setLocales(serverLocaleProvider
                 .getAvailableLocales()
                 .stream()
                 .map(Locale::getDisplayName)
@@ -169,7 +169,7 @@ public class PersonalSettingsController {
         if (SpeechToTextLangScheme.DEFAULT.name().equals(userSettings.getSpeechLangSchemeName())) {
             command
                 .setIetf(SupportableBCP47
-                    .valueOf(isEmpty(userSettings.getLocale()) ? serverLocaleService.getLocale()
+                    .valueOf(isEmpty(userSettings.getLocale()) ? serverLocaleProvider.getLocale()
                             : userSettings.getLocale())
                     .getValue());
         } else {
@@ -178,11 +178,11 @@ public class PersonalSettingsController {
         if (isEmpty(userSettings.getLocale())) {
             command
                 .setIetfDefault(
-                        SupportableBCP47.valueOf(serverLocaleService.getLocale()).getValue());
+                        SupportableBCP47.valueOf(serverLocaleProvider.getLocale()).getValue());
             command
-                .setIetfDisplayDefault(serverLocaleService
+                .setIetfDisplayDefault(serverLocaleProvider
                     .getLocale()
-                    .getDisplayName(serverLocaleService.getLocale()));
+                    .getDisplayName(serverLocaleProvider.getLocale()));
         } else {
             command.setIetfDefault(SupportableBCP47.valueOf(userSettings.getLocale()).getValue());
             command
@@ -232,6 +232,8 @@ public class PersonalSettingsController {
         toast.ifPresent(command::setShowToast);
         command.setShareCount(shareService.getAllShares().size());
         command.setUseRadio(settingsFacade.get(SKeys.general.legacy.useRadio));
+        command
+            .setUseDatabaseSettings(settingsFacade.get(SKeys.general.legacy.useDatabaseSettings));
 
         model.addAttribute(Attributes.Model.Command.VALUE, command);
     }
@@ -255,7 +257,7 @@ public class PersonalSettingsController {
         int localeIndex = Integer.parseInt(command.getLocaleIndex());
         Locale locale = null;
         if (localeIndex != -1) {
-            locale = serverLocaleService.getAvailableLocales().get(localeIndex);
+            locale = serverLocaleProvider.getAvailableLocales().get(localeIndex);
         }
         settings.setLocale(locale);
 

@@ -70,7 +70,7 @@ class PlaylistServiceTest {
                     mock(UserService.class), settingsFacade,
                     new ScanningExclusionPolicy(settingsFacade),
                     Arrays.asList(new DefaultPlaylistExportHandler(mediaFileDao)),
-                    Collections.emptyList(), null);
+                    Collections.emptyList(), null, null);
         }
 
         @Test
@@ -150,7 +150,7 @@ class PlaylistServiceTest {
             playlistService = new PlaylistService(mock(MediaFileDao.class), playlistDao,
                     mock(UserService.class), settingsFacade,
                     new ScanningExclusionPolicy(settingsFacade), Collections.emptyList(),
-                    Arrays.asList(importHandler), null);
+                    Arrays.asList(importHandler), null, null);
             actual = ArgumentCaptor.forClass(Playlist.class);
             medias = ArgumentCaptor.forClass(List.class);
         }
@@ -362,7 +362,7 @@ class PlaylistServiceTest {
                     mediaFileService);
             playlistService = new PlaylistService(mock(MediaFileDao.class), playlistDao,
                     userService, settingsFacade, new ScanningExclusionPolicy(settingsFacade),
-                    Collections.emptyList(), Arrays.asList(importHandler), null);
+                    Collections.emptyList(), Arrays.asList(importHandler), null, null);
         }
 
         @Test

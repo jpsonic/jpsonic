@@ -23,10 +23,12 @@ package com.tesshu.jpsonic.persistence.api.entity;
 
 import java.time.Instant;
 
+import com.tesshu.jpsonic.domain.contract.Nameable;
 import com.tesshu.jpsonic.util.StringUtil;
 import org.checkerframework.checker.nullness.qual.NonNull;
 
-public class Playlist {
+@SuppressWarnings("PMD.AvoidFieldNameMatchingMethodName")
+public class Playlist implements Nameable {
 
     private int id;
     private String username;
@@ -150,4 +152,8 @@ public class Playlist {
         this.reading = reading;
     }
 
+    @Override
+    public @NonNull String name() {
+        return getName();
+    }
 }

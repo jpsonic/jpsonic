@@ -28,7 +28,7 @@ import java.net.URL;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 
-import com.tesshu.jpsonic.util.StringUtil;
+import com.tesshu.jpsonic.domain.language.StringUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;

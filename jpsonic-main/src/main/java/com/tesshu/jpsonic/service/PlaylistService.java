@@ -35,14 +35,17 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 
 import chameleon.playlist.SpecificPlaylist;
 import chameleon.playlist.SpecificPlaylistFactory;
 import chameleon.playlist.SpecificPlaylistProvider;
 import com.tesshu.jpsonic.feature.upnp.UPnPSKeys;
+import com.tesshu.jpsonic.infrastructure.comparator.ComparatorsFacade;
 import com.tesshu.jpsonic.infrastructure.concurrent.ConcurrentUtils;
 import com.tesshu.jpsonic.infrastructure.filesystem.PathInspector;
 import com.tesshu.jpsonic.infrastructure.filesystem.ScanningExclusionPolicy;
+import com.tesshu.jpsonic.infrastructure.language.MetadataReadingProcessor;
 import com.tesshu.jpsonic.infrastructure.settings.SKeys;
 import com.tesshu.jpsonic.infrastructure.settings.SettingsFacade;
 import com.tesshu.jpsonic.persistence.api.entity.MediaFile;
@@ -51,7 +54,6 @@ import com.tesshu.jpsonic.persistence.api.entity.Playlist;
 import com.tesshu.jpsonic.persistence.api.repository.MediaFileDao;
 import com.tesshu.jpsonic.persistence.api.repository.PlaylistDao;
 import com.tesshu.jpsonic.persistence.core.entity.User;
-import com.tesshu.jpsonic.service.language.JpsonicComparators;
 import com.tesshu.jpsonic.service.playlist.PlaylistExportHandler;
 import com.tesshu.jpsonic.service.playlist.PlaylistImportHandler;
 import org.apache.commons.lang3.tuple.Pair;
@@ -83,13 +85,14 @@ public class PlaylistService {
     private final ScanningExclusionPolicy scanningExclusionPolicy;
     private final List<PlaylistExportHandler> exportHandlers;
     private final List<PlaylistImportHandler> importHandlers;
-    private final JpsonicComparators comparators;
+    private final MetadataReadingProcessor readingProcessor;
+    private final ComparatorsFacade comparatorsFacade;
 
     public PlaylistService(MediaFileDao mediaFileDao, PlaylistDao playlistDao,
             UserService userService, SettingsFacade settingsFacade,
             ScanningExclusionPolicy scanningExclusionPolicy,
             List<PlaylistExportHandler> exportHandlers, List<PlaylistImportHandler> importHandlers,
-            JpsonicComparators comparators) {
+            MetadataReadingProcessor readingProcessor, ComparatorsFacade comparatorsFacade) {
         this.mediaFileDao = mediaFileDao;
         this.playlistDao = playlistDao;
         this.userService = userService;
@@ -97,7 +100,8 @@ public class PlaylistService {
         this.scanningExclusionPolicy = scanningExclusionPolicy;
         this.exportHandlers = exportHandlers;
         this.importHandlers = importHandlers;
-        this.comparators = comparators;
+        this.readingProcessor = readingProcessor;
+        this.comparatorsFacade = comparatorsFacade;
     }
 
     public int getCountAll() {
@@ -125,11 +129,6 @@ public class PlaylistService {
         return sort(playlistDao.getWritablePlaylistsForUser(username));
     }
 
-    private List<Playlist> sort(List<Playlist> playlists) {
-        playlists.sort(comparators.playlistOrder());
-        return playlists;
-    }
-
     public @Nullable Playlist getPlaylist(int id) {
         return playlistDao.getPlaylist(id);
     }
@@ -144,10 +143,6 @@ public class PlaylistService {
 
     public List<String> getPlaylistUsers(int playlistId) {
         return playlistDao.getPlaylistUsers(playlistId);
-    }
-
-    public int getCountInPlaylist(int id) {
-        return mediaFileDao.getCountInPlaylist(id);
     }
 
     public List<MediaFile> getFilesInPlaylist(int id) {
@@ -200,6 +195,15 @@ public class PlaylistService {
 
     public boolean isWriteAllowed(Playlist playlist, String username) {
         return username != null && username.equals(playlist.getUsername());
+    }
+
+    private List<Playlist> sort(List<Playlist> playlists) {
+        return playlists
+            .stream()
+            .map(readingProcessor::analyzeName)
+            .sorted(comparatorsFacade.nameableOrder())
+            .map(Pair::getKey)
+            .collect(Collectors.toCollection(ArrayList::new));
     }
 
     public void deletePlaylist(int id) {
